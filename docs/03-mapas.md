@@ -4,135 +4,178 @@ Hoy la app dibuja su propio mapa (`src/components/map/MapCanvas.tsx`). No
 consume ninguna API y funciona en iOS, Android y web. Este documento es el plan
 para cuando queramos tiles de verdad.
 
-## Antes de empezar: dos cosas que hay que saber
+**La abstracción ya está.** `src/components/map/types.ts` define `MapViewProps`.
+Basta escribir un componente que cumpla esa firma y cambiar el `export` de
+`src/components/map/index.ts`. Ninguna pantalla se toca.
 
-1. **Cualquier SDK de mapas es un módulo nativo.** Eso significa que deja de
-   funcionar en Expo Go y hay que pasar a un *development build*
-   (`eas build --profile development`). Es un cambio de flujo de trabajo, no solo
-   una dependencia más.
-2. **La abstracción ya está.** `src/components/map/types.ts` define
-   `MapViewProps`. Basta escribir un componente nuevo que cumpla esa firma y
-   cambiar el `export` de `src/components/map/index.ts`. Ninguna pantalla se
-   toca.
+---
 
-## Proveedor recomendado: Geoapify
+## Recomendación: Google Maps
 
-| | Geoapify | MapTiler | Google Maps | Mapbox |
+Para una app **móvil** en **Colombia**, Google Maps es la mejor opción, por dos
+razones que pesan más que cualquier otra consideración:
+
+### 1. En móvil, el mapa es gratis sin límite
+
+Google Maps Platform reestructuró sus precios: los SKU **Maps SDK for Android** y
+**Maps SDK for iOS** figuran con uso gratuito **ilimitado** — no se cobra por
+carga de mapa. Lo que sí se cobra es el resto de servicios (geocodificación,
+autocompletado, direcciones), con 10.000 llamadas gratis al mes en el nivel
+Essentials y facturación a partir de ahí.
+
+Traducido a nuestro caso: **pintar el mapa con los marcadores de precio no cuesta
+nada, por muchos usuarios que tengamos.** El gasto solo aparecería si usamos
+geocodificación intensivamente, y eso se controla.
+
+### 2. Los datos de Bogotá son mucho mejores
+
+OpenStreetMap tiene buena cobertura de vías en Bogotá, pero floja en
+direcciones tipo "Carrera 15 # 85-32", nombres de edificios y puntos de interés.
+Para un marketplace donde el conductor busca por dirección o por "Zona T", esa
+diferencia se nota en la primera búsqueda. Google también es lo que el usuario
+colombiano ya tiene instalado y espera.
+
+### 3. Y funciona en Expo Go
+
+**`react-native-maps` viene incluido en Expo Go.** Se puede probar el mapa real
+escaneando el QR, sin development build. Solo hace falta configurar las claves
+para compilar los binarios de las tiendas.
+
+### Lo que hay que aceptar
+
+- **Exige cuenta de facturación con tarjeta**, aunque el uso caiga en la capa
+  gratuita. Sin tarjeta no dan la API key.
+- **Hay que poner límites el primer día**, no después: cuotas por API en Google
+  Cloud y alertas de presupuesto. Es lo que evita una factura sorpresa si la
+  geocodificación se dispara por un bug.
+- Los usuarios nuevos tienen **300 USD de crédito por 90 días**, así que la fase
+  de desarrollo no cuesta nada.
+
+---
+
+## Alternativas, y cuándo tendrían sentido
+
+| | Google Maps | Geoapify | MapTiler | Mapbox |
 |---|---|---|---|---|
-| Plan gratis | 3.000 créditos/día | 100.000 peticiones/mes | Capa gratuita mensual | 50.000 cargas/mes |
-| ¿Tarjeta al registrarse? | No | No | **Sí** | **Sí** |
-| ¿Uso comercial en el plan gratis? | Sí, limitado, con atribución | **No** — solo pruebas y uso personal | Sí | Sí |
-| Estilos desaturados | Sí (`positron`) | Sí | Requiere estilo personalizado | Sí (Studio) |
+| Mapa en móvil | **Gratis ilimitado** | 3.000 créditos/día | 100.000 pet./mes | 50.000 cargas/mes |
+| ¿Tarjeta? | **Sí** | No | No | Sí |
+| ¿Uso comercial gratis? | Sí | Sí, limitado | **No** | Sí |
+| Datos en Colombia | **Los mejores** | OSM | OSM | OSM + propios |
+| Control del estilo | Medio | Alto | Alto | **El más alto** |
+| Soporte web | Otra librería | Sí | Sí | Sí |
 
-**Geoapify** es la mejor opción para nosotros ahora: no pide tarjeta, permite uso
-comercial limitado y con una sola clave cubre *tiles*, geocodificación y mapas
-estáticos. Cuando el volumen supere el plan gratis, Google o Mapbox son los
-siguientes pasos naturales — para entonces ya habrá con qué pagarlo.
+- **Geoapify** — la opción si en algún momento no queremos dar tarjeta, o para
+  geocodificación barata en paralelo a Google.
+- **MapTiler** — los estilos más bonitos, pero su plan gratis es explícitamente
+  **no comercial**: sirve para maquetar, no para lanzar.
+- **Mapbox** — el mayor control visual; tiene sentido el día que el mapa sea
+  parte central de la identidad y queramos diseñarlo en Mapbox Studio.
 
-MapTiler tiene los estilos más bonitos y una cuota mucho mayor, pero su plan
-gratuito es explícitamente **no comercial**, así que sirve para maquetar, no para
-lanzar.
+---
 
-## Cómo obtener la clave
+## Cómo hacerlo
 
-1. Crear cuenta en <https://myprojects.geoapify.com/register> (correo, sin
-   tarjeta).
-2. **New project** → nombre `easy-parking`.
-3. Copiar la **API key** que se genera.
-4. En *Settings* del proyecto, restringir la clave antes de usarla en
-   producción:
-   - **Allowed domains** → los dominios de la web (`easyparking.app`).
-   - **Allowed bundle IDs / package names** → `app.easyparking.mobile`, que es
-     el identificador que ya usa `app.json` en iOS y Android.
+### 1. Obtener la clave
 
-Sin esas restricciones la clave queda abierta a que cualquiera la use y consuma
-la cuota.
+1. <https://console.cloud.google.com/> → crear proyecto `easy-parking`.
+2. Activar facturación (pide tarjeta).
+3. **APIs & Services → Enable APIs** → habilitar *Maps SDK for Android* y
+   *Maps SDK for iOS*. Nada más por ahora: cada API habilitada es superficie
+   que puede generar cobro.
+4. **Credentials → Create credentials → API key**.
 
-## Configuración en el proyecto
+### 2. Restringir la clave antes de usarla
 
-La clave no se escribe en el código. Va por variable de entorno:
+Esto no es opcional. Una clave abierta la puede usar cualquiera y la factura
+llega a nosotros.
+
+- **Application restrictions**
+  - Android: *Android apps* → package `app.easyparking.mobile` + huella SHA-1
+    del certificado (la da `eas credentials`).
+  - iOS: *iOS apps* → bundle ID `app.easyparking.mobile`.
+- **API restrictions** → solo los dos SDK de mapas.
+
+### 3. Poner un techo de gasto
+
+En **Billing → Budgets & alerts**, presupuesto con avisos al 50 %, 90 % y 100 %.
+Y en **APIs & Services → Quotas**, un tope diario de peticiones por API. El
+presupuesto avisa; la cuota es la que de verdad corta.
+
+### 4. Configurar el proyecto
+
+La clave no se escribe en el código:
 
 ```bash
 # .env.local  (ignorado por git)
-EXPO_PUBLIC_MAP_API_KEY=la_clave_de_geoapify
+EXPO_PUBLIC_GOOGLE_MAPS_KEY=la_clave
 ```
-
-Expo expone al bundle cualquier variable con prefijo `EXPO_PUBLIC_`. Para los
-builds de EAS se sube como secreto:
 
 ```bash
-eas secret:create --name EXPO_PUBLIC_MAP_API_KEY --value la_clave
+eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_KEY --value la_clave
 ```
 
-Y se lee en un único sitio, nunca repartida por el código:
+En `app.json`:
 
-```ts
-// src/constants/config.ts
-export const mapApiKey = process.env.EXPO_PUBLIC_MAP_API_KEY ?? '';
-export const mapStyleUrl =
-  `https://maps.geoapify.com/v1/styles/positron/style.json?apiKey=${mapApiKey}`;
+```json
+["react-native-maps", {
+  "androidGoogleMapsApiKey": "$EXPO_PUBLIC_GOOGLE_MAPS_KEY",
+  "iosGoogleMapsApiKey": "$EXPO_PUBLIC_GOOGLE_MAPS_KEY"
+}]
 ```
-
-### Estilo
-
-Usar **`positron`**: gris claro, calles blancas, etiquetas discretas. Es
-exactamente la dirección del mapa que dibujamos a mano, y es la que deja que las
-píldoras de precio sean lo único con contraste en pantalla. Los estilos
-saturados (`osm-carto`, `osm-bright`) compiten con los marcadores y rompen la
-identidad.
-
-Otras opciones del mismo proveedor si algún día hace falta: `positron-blue`,
-`dark-matter` (para un modo oscuro futuro), `osm-bright-grey`.
-
-### Librería
 
 ```bash
-npx expo install @maplibre/maplibre-react-native
+npx expo install react-native-maps
 ```
 
-MapLibre es open source y consume el estilo de cualquier proveedor, así que
-cambiar de Geoapify a MapTiler o a tiles propios más adelante es cambiar una URL.
-Evita el bloqueo con un proveedor, que es justo lo que queremos en la capa que
-más caro sale escalar.
+### 5. Escribir el componente
 
-`react-native-maps` es la alternativa, pero ata el proyecto a Google/Apple y da
-mucho menos control del estilo.
-
-### Qué hay que escribir
-
-Un solo archivo, `src/components/map/MapLibreView.tsx`, que cumpla
+Un solo archivo, `src/components/map/MapGoogleView.tsx`, que cumpla
 `MapViewProps`:
 
-- `markers` → `MarkerView` con el mismo `PriceMarker` que ya existe.
-- `userLocation` → `UserLocation` de MapLibre, o el `UserDot` actual.
-- `focus` → `camera.setCamera({ centerCoordinate, padding })`, usando
-  `topInset` / `bottomInset` como padding para que el marcador no quede detrás
-  de la hoja.
-- La pasada que separa marcadores solapados puede desaparecer: MapLibre tiene
-  *clustering* nativo, que es mejor solución a partir de cierta densidad.
+- `provider={PROVIDER_GOOGLE}` en el `MapView`.
+- `markers` → `<Marker>` con el `PriceMarker` que ya existe como hijo
+  (`tracksViewChanges={false}` después del primer render, o los marcadores
+  personalizados destrozan el rendimiento en Android).
+- `focus` → `mapRef.animateCamera({ center }, { duration })`, con `topInset` y
+  `bottomInset` como `mapPadding` para que el marcador no quede tras la hoja.
+- La pasada que separa marcadores solapados se puede quitar: conviene pasar a
+  *clustering* real.
 
-Y en `index.ts`:
+### 6. Estilo — importante para no perder la identidad
+
+El estilo por defecto de Google es saturado y compite con nuestras píldoras de
+precio. Hay que desaturarlo con `customMapStyle`: un JSON que baje la saturación,
+deje las vías en blanco y reduzca los POI. La referencia es lo que ya dibuja
+`MapBackdrop`: gris claro, vías blancas, etiquetas discretas, verde solo en
+parques.
+
+Sin ese paso el mapa se ve como cualquier otra app y perdemos lo que más
+distingue la pantalla principal.
+
+### 7. Conservar el mapa dibujado para web
+
+`react-native-maps` no soporta web. En `index.ts`:
 
 ```ts
-export { MapLibreView as MapView } from './MapLibreView';
+import { Platform } from 'react-native';
+export const MapView = Platform.OS === 'web' ? MapCanvas : MapGoogleView;
 ```
 
-Conviene **conservar `MapCanvas`** y elegir la implementación según plataforma:
-MapLibre no soporta web, y el mapa dibujado sí. Es la forma de no perder la
-versión web.
+Así la versión web sigue funcionando y no perdemos la superficie de QA rápida.
+
+---
 
 ## Geocodificación
 
-La búsqueda actual solo encuentra parqueaderos de los datos mock. Con la misma
-clave de Geoapify se resuelve una dirección real:
+La búsqueda actual solo encuentra parqueaderos de los datos mock. Para resolver
+direcciones reales hay dos caminos:
 
-```
-https://api.geoapify.com/v1/geocode/autocomplete?text=calle+85&filter=countrycode:co&apiKey=...
-```
+- **Google Geocoding / Places Autocomplete** — la mejor calidad en Colombia,
+  10.000 llamadas gratis al mes y luego se paga. Conviene *debounce* agresivo y
+  cachear resultados: es el único punto donde el mapa nos puede costar dinero.
+- **Nominatim (OpenStreetMap)** — gratis y sin registro, pero su política limita
+  a 1 petición por segundo y exige un `User-Agent` identificable. Sirve para
+  desarrollo, no para producción.
 
 Va en `src/services/parkings.ts`, dentro de `fetchSuggestions`, mezclando los
 resultados reales con las zonas de Bogotá que ya sugerimos. La firma no cambia.
-
-Alternativa sin clave: **Nominatim** (OpenStreetMap), gratis y sin registro, pero
-su política de uso limita a 1 petición por segundo y exige un `User-Agent`
-identificable. Sirve para desarrollo, no para producción.

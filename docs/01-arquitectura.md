@@ -68,9 +68,7 @@ no cuesta renders.
 
 Para pasar a mapas reales basta escribir un componente que cumpla
 `MapViewProps` y cambiar el `export` de `index.ts`. Ninguna pantalla cambia.
-Candidatos: Google Maps (requiere key por plataforma y facturación) o
-Mapbox/MapLibre (token gratuito y mucho más control del estilo, que encaja mejor
-con un mapa desaturado donde los marcadores son el contenido).
+La recomendación y los pasos están en [`03-mapas.md`](03-mapas.md).
 
 ## Precios
 
@@ -120,8 +118,10 @@ curl -s https://api.expo.dev/v2/versions/latest | node -e "let d='';process.stdi
 Ese número es el que debe aparecer en `sdkVersion` al correr
 `npx expo config --type public`. Si algún día queremos subir de SDK antes de que
 las tiendas lo soporten, hay que dejar de usar Expo Go y pasar a un
-*development build* (`eas build --profile development`) — que además es lo que
-vamos a necesitar cuando entren los mapas reales, porque son módulos nativos.
+*development build* (`eas build --profile development`).
+
+Nota: `react-native-maps` **sí** viene incluido en Expo Go, así que los mapas
+reales se pueden probar con el QR sin development build.
 
 ### Si el QR no conecta
 
