@@ -13,4 +13,5 @@ export { Screen, StickyBar } from './Screen';
 export { SegmentedControl } from './SegmentedControl';
 export { ParkingRowSkeleton, Skeleton } from './Skeleton';
 export { Surface } from './Surface';
+export { Toggle } from './Toggle';
 export { Overline, Text } from './Text';

@@ -96,8 +96,8 @@ mitad de la sensación de calidad.
 
 `Text` · `Button` (primary / secondary / ghost / accent / danger) · `IconButton`
 · `Chip` · `Surface` · `Row` · `Divider` · `Input` · `Skeleton` · `EmptyState` ·
-`Rating` · `Badge` · `AvailabilityBadge` · `SegmentedControl` · `Avatar` ·
-`Screen` · `StickyBar`.
+`Rating` · `Badge` · `AvailabilityBadge` · `SegmentedControl` · `Toggle` ·
+`Avatar` · `Screen` · `StickyBar`.
 
 Del dominio: `ParkingRow`, `ParkingPreviewCard`, `PhotoGallery`, `FeatureGrid`,
 `ReviewRow`, `DateStrip`, `TimeField`, `PriceSummary`, `PaymentMethodPicker`,
