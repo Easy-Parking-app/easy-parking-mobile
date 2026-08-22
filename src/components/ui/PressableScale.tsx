@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { motion } from '@/constants/theme';
+import { hapticsEnabled } from '@/store/useSettingsStore';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -47,7 +48,7 @@ export const PressableScale = forwardRef<View, PressableScaleProps>(function Pre
   const handlePressIn = useCallback<NonNullable<PressableProps['onPressIn']>>(
     (event) => {
       pressed.value = 1;
-      if (haptic && Platform.OS !== 'web') {
+      if (haptic && Platform.OS !== 'web' && hapticsEnabled()) {
         void Haptics.selectionAsync();
       }
       onPressIn?.(event);

@@ -41,6 +41,7 @@ export default function RootLayout() {
             options={{ animation: 'fade', gestureEnabled: false }}
           />
           <Stack.Screen name="reserva/[id]" />
+          <Stack.Screen name="configuracion" />
           <Stack.Screen name="propietario" />
         </Stack>
       </SafeAreaProvider>

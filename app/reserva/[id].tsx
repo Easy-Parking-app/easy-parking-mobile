@@ -8,6 +8,7 @@ import {
   MapPin,
   MessageCircle,
   Phone,
+  Route,
 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, View } from 'react-native';
@@ -28,7 +29,9 @@ import { useAsync } from '@/hooks/useAsync';
 import { cancelBooking } from '@/services/bookings';
 import { fetchBooking } from '@/services/bookings';
 import type { BookingStatus } from '@/types';
+import { navigationAppLabels, useSettingsStore } from '@/store/useSettingsStore';
 import { formatCop, formatLongDate, formatMinutes, minutesOfDay } from '@/utils/format';
+import { openDirections } from '@/utils/navigation';
 
 const statusTone: Record<BookingStatus, { label: string; fg: string; bg: string }> = {
   proxima: { label: 'Próxima', fg: palette.accent, bg: palette.accentSoft },
@@ -42,6 +45,7 @@ export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
+  const navigationApp = useSettingsStore((state) => state.navigationApp);
 
   const { data: booking, loading, error, reload } = useAsync(() => fetchBooking(id ?? ''), [id]);
 
@@ -143,6 +147,15 @@ export default function BookingDetailScreen() {
           <Overline>Ubicación</Overline>
           <MapStatic height={150} />
           <Line icon={MapPin} label={booking.parking.address} />
+          <Row
+            icon={Route}
+            label={`Cómo llegar con ${navigationAppLabels[navigationApp]}`}
+            detail="Puedes cambiar la app en Configuración"
+            onPress={() => {
+              void openDirections(navigationApp, booking.parking.coordinate, booking.parking.name);
+            }}
+            style={styles.row}
+          />
         </View>
 
         <Divider />

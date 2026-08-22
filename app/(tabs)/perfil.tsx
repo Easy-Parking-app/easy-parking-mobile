@@ -95,7 +95,7 @@ export default function ProfileScreen() {
           <Overline style={styles.groupTitle}>Cuenta</Overline>
           <Row icon={Wallet} label="Métodos de pago" detail="Nequi · Visa •••• 4821" onPress={() => undefined} />
           <Divider inset={space.giant} />
-          <Row icon={Settings} label="Configuración" onPress={() => undefined} />
+          <Row icon={Settings} label="Configuración" onPress={() => router.push('/configuracion')} />
           <Divider inset={space.giant} />
           <Row icon={CircleQuestionMark} label="Ayuda y soporte" onPress={() => undefined} />
         </View>
