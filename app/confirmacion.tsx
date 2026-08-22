@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Calendar, Check, CircleAlert, Clock, Info, MapPin } from 'lucide-react-native';
+import { Calendar, Check, CircleAlert, CreditCard, Info, MapPin } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -114,7 +114,7 @@ export default function ConfirmationScreen() {
             detail={`${formatMinutes(minutesOfDay(startsAt))} – ${formatMinutes(minutesOfDay(endsAt))}`}
           />
           <Detail
-            icon={Clock}
+            icon={CreditCard}
             label={`Pagaste ${formatCop(booking.price.total)}`}
             detail={`${booking.paymentMethod.label} · ${booking.paymentMethod.detail}`}
           />
