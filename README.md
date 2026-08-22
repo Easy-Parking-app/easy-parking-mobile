@@ -69,6 +69,7 @@ Documentación detallada en [`docs/`](docs/):
 - [`00-producto.md`](docs/00-producto.md) — qué construimos y qué aprendimos del prototipo v0
 - [`01-arquitectura.md`](docs/01-arquitectura.md) — decisiones técnicas y ruta hacia Supabase
 - [`02-design-system.md`](docs/02-design-system.md) — identidad visual y tokens
+- [`03-mapas.md`](docs/03-mapas.md) — plan para pasar a mapas reales y qué proveedor usar
 
 ---
 
