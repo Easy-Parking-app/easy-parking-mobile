@@ -1,12 +1,174 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Easy Parking · device preview</title>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Easy Parking · vista de dispositivo</title>
 <style>
-  body{margin:0;background:#EDEEF0;font-family:-apple-system,system-ui,sans-serif;display:flex;gap:28px;padding:24px;align-items:flex-start;justify-content:center}
-  .device{width:390px;height:760px;border-radius:44px;background:#000;padding:10px;box-shadow:0 24px 60px rgba(0,0,0,.28)}
-  iframe{width:390px;height:760px;border:0;border-radius:36px;background:#fff}
-  .label{position:fixed;top:8px;left:12px;font-size:12px;color:#5B6472}
-</style></head>
+  :root {
+    --bg: #eceef1;
+    --panel: #ffffff;
+    --ink: #0a0d12;
+    --ink-2: #5b6472;
+    --hairline: #e3e6ec;
+    --bezel: #14171c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181d;
+      --panel: #1e2127;
+      --ink: #f2f4f7;
+      --ink-2: #98a1ae;
+      --hairline: #2b2f37;
+      --bezel: #000000;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+  }
+
+  header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  select, button {
+    font: inherit;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--hairline);
+    border-radius: 7px;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  button:hover, select:hover { border-color: var(--ink-2); }
+
+  .spacer { flex: 1; }
+  .meta { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+  main {
+    flex: 1 1 auto;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    padding: 14px;
+  }
+
+  /* El marco se escala para caber en el panel, por estrecho que sea.
+     El origen va arriba a la izquierda y la caja se redimensiona por JS:
+     `transform: scale()` no cambia el tamaño de layout, así que sin eso el
+     teléfono se sale por abajo aunque visualmente quepa. */
+  #stage { transform-origin: top left; }
+
+  .device {
+    background: var(--bezel);
+    border-radius: 44px;
+    padding: 11px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .28);
+  }
+
+  iframe {
+    display: block;
+    border: 0;
+    border-radius: 34px;
+    background: #fff;
+  }
+</style>
+</head>
 <body>
-  <div class="label">Easy Parking — iPhone 14 (390×760)</div>
-  <div class="device"><iframe src="http://localhost:8081/"></iframe></div>
-</body></html>
+  <header>
+    <select id="device" aria-label="Dispositivo"></select>
+    <button id="reload" title="Recargar la app">Recargar</button>
+    <span class="spacer"></span>
+    <span class="meta" id="meta"></span>
+  </header>
+
+  <main id="main">
+    <div id="stage">
+      <div class="device">
+        <iframe id="app" title="Easy Parking"></iframe>
+      </div>
+    </div>
+  </main>
+
+<script>
+  const APP_URL = 'http://localhost:8081/';
+
+  const DEVICES = [
+    { id: 'iphone-14',    label: 'iPhone 14',        w: 390, h: 844 },
+    { id: 'iphone-se',    label: 'iPhone SE',        w: 375, h: 667 },
+    { id: 'iphone-max',   label: 'iPhone 16 Pro Max',w: 440, h: 956 },
+    { id: 'pixel-7',      label: 'Pixel 7',          w: 412, h: 915 },
+    { id: 'galaxy-s8',    label: 'Galaxy S8 (chico)',w: 360, h: 740 },
+  ];
+
+  const select = document.getElementById('device');
+  const stage  = document.getElementById('stage');
+  const frame  = document.getElementById('app');
+  const meta   = document.getElementById('meta');
+  const main   = document.getElementById('main');
+
+  DEVICES.forEach((d) => {
+    const option = document.createElement('option');
+    option.value = d.id;
+    option.textContent = d.label;
+    select.appendChild(option);
+  });
+
+  const stored = localStorage.getItem('ep-device');
+  select.value = DEVICES.some((d) => d.id === stored) ? stored : 'iphone-14';
+
+  let current = DEVICES[0];
+
+  function fit() {
+    // Escala para que el teléfono entre siempre en el panel, aunque sea angosto.
+    const pad = 28;
+    const availableW = main.clientWidth - pad;
+    const availableH = main.clientHeight - pad;
+    const frameW = current.w + 22;
+    const frameH = current.h + 22;
+    const scale = Math.min(1, availableW / frameW, availableH / frameH);
+
+    stage.style.transform = `scale(${scale})`;
+    // La caja tiene que ocupar el tamaño ya escalado para que el centrado del
+    // grid funcione; si no, el marco se desborda por abajo.
+    stage.style.width = frameW * scale + 'px';
+    stage.style.height = frameH * scale + 'px';
+
+    meta.textContent = `${current.w}×${current.h} · ${Math.round(scale * 100)}%`;
+  }
+
+  function apply() {
+    current = DEVICES.find((d) => d.id === select.value) || DEVICES[0];
+    frame.style.width = current.w + 'px';
+    frame.style.height = current.h + 'px';
+    localStorage.setItem('ep-device', current.id);
+    fit();
+  }
+
+  select.addEventListener('change', apply);
+  document.getElementById('reload').addEventListener('click', () => {
+    frame.src = APP_URL + '?t=' + Date.now();
+  });
+  window.addEventListener('resize', fit);
+
+  frame.src = APP_URL;
+  apply();
+</script>
+</body>
+</html>

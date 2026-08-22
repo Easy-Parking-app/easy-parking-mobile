@@ -1,0 +1,61 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Easy Parking: vista previa",
+      "detail": "Levanta Metro y la vista de dispositivo. Luego: Ctrl+Shift+P → Simple Browser: Show → http://localhost:8090",
+      "dependsOn": ["metro (web)", "marco de dispositivo"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "metro (web)",
+      "type": "shell",
+      "command": "npx expo start --web --port 8081",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "group": "easy-parking",
+        "panel": "dedicated",
+        "reveal": "silent"
+      }
+    },
+    {
+      "label": "marco de dispositivo",
+      "type": "shell",
+      "command": "node .devtools/serve.js",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "group": "easy-parking",
+        "panel": "dedicated",
+        "reveal": "silent"
+      }
+    },
+    {
+      "label": "Easy Parking: Expo Go (LAN)",
+      "detail": "Servidor para escanear el QR desde el celular, forzando la IP del Wi-Fi",
+      "type": "shell",
+      "command": "npx expo start --host lan --port 8081",
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "Easy Parking: Expo Go (túnel)",
+      "detail": "Usa esto si el QR no conecta: funciona aunque el celular esté en otra red",
+      "type": "shell",
+      "command": "npx expo start --tunnel --port 8081",
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "Easy Parking: typecheck",
+      "type": "shell",
+      "command": "npm run typecheck",
+      "problemMatcher": ["$tsc"],
+      "group": "test",
+      "presentation": { "panel": "dedicated" }
+    }
+  ]
+}
