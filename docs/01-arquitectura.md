@@ -4,7 +4,7 @@
 
 | Capa | Elección | Por qué |
 |---|---|---|
-| Runtime | React Native 0.86 + Expo SDK 57 | Un código para iOS, Android y web; OTA y builds sin Xcode local |
+| Runtime | React Native 0.81 + **Expo SDK 54** | Un código para iOS, Android y web. SDK 54 a propósito: es la versión que soporta el Expo Go publicado en las tiendas, así que el QR funciona sin development build |
 | Lenguaje | TypeScript `strict` + `noUncheckedIndexedAccess` | El modelo de dominio es el contrato con el backend futuro |
 | Navegación | `expo-router` (rutas por archivo, tipadas) | El árbol de archivos *es* el mapa de la app |
 | Estado | Zustand (+ `persist` sobre AsyncStorage) | Cuatro slices pequeños; sin boilerplate ni context hell |
@@ -101,3 +101,44 @@ contradice entre pantallas.
   borde y color de etiqueta a la vez.
 - `accessibilityLabel`, `accessibilityHint` y `accessibilityState` en cada
   control; `accessibilityRole="tablist"` en el control segmentado.
+
+## Versión del SDK y Expo Go
+
+El proyecto está fijado a **Expo SDK 54** a propósito.
+
+`create-expo-app@latest` instala la SDK más nueva publicada en npm, que suele ir
+por delante del Expo Go que hay en la App Store y en Play Store. Cuando eso pasa,
+escanear el QR devuelve *"este proyecto no es compatible con esta versión de
+Expo Go"* aunque el Expo Go esté al día.
+
+Para comprobar qué SDK soporta el Expo Go de las tiendas:
+
+```bash
+curl -s https://api.expo.dev/v2/versions/latest | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).data.expoGoSdkVersion))"
+```
+
+Ese número es el que debe aparecer en `sdkVersion` al correr
+`npx expo config --type public`. Si algún día queremos subir de SDK antes de que
+las tiendas lo soporten, hay que dejar de usar Expo Go y pasar a un
+*development build* (`eas build --profile development`) — que además es lo que
+vamos a necesitar cuando entren los mapas reales, porque son módulos nativos.
+
+### Si el QR no conecta
+
+Expo elige una IP de la máquina para el QR y a veces acierta con la del
+adaptador equivocado (VirtualBox, WSL, VPN). En ese caso:
+
+```bash
+npm run start:tunnel
+```
+
+El túnel funciona aunque el teléfono esté en otra red.
+
+## Nota sobre Metro y zustand
+
+`metro.config.js` resuelve `zustand` a su build CommonJS **solo en web**. El
+build ESM del paquete usa `import.meta.env` en su middleware de devtools, que
+Metro no puede empaquetar para navegador: el resultado es una pantalla en blanco
+con `SyntaxError: Cannot use 'import.meta' outside a module`. En nativo no pasa,
+porque ahí Metro toma la condición de exportación `react-native`, que ya apunta a
+CommonJS.

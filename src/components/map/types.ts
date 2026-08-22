@@ -1,4 +1,4 @@
-import type { ViewStyle } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 
 import type { LatLng } from '@/types';
 
@@ -31,5 +31,5 @@ export type MapViewProps = {
   /** Extra top inset so markers are not hidden behind floating controls. */
   topInset?: number;
   interactive?: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 };
