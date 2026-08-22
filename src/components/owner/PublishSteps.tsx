@@ -1,0 +1,364 @@
+import { Minus, Plus } from 'lucide-react-native';
+import { StyleSheet, View } from 'react-native';
+
+import { TimeField } from '@/components/booking/TimeField';
+import { MapStatic } from '@/components/map';
+import { Chip } from '@/components/ui/Chip';
+import { IconButton } from '@/components/ui/IconButton';
+import { Input } from '@/components/ui/Input';
+import { Surface } from '@/components/ui/Surface';
+import { Overline, Text } from '@/components/ui/Text';
+import { featureCatalog, featureOrder, kindCatalog, kindOrder } from '@/constants/catalog';
+import { palette, radius, space } from '@/constants/theme';
+import { useListingDraftStore } from '@/store/useListingDraftStore';
+import { formatCop, formatMinutes } from '@/utils/format';
+import { PhotoPickerGrid } from './PhotoPickerGrid';
+
+const ZONES = ['Chapinero', 'Chicó', 'Zona T', 'Usaquén', 'Cedritos', 'Salitre', 'Teusaquillo'];
+const PRICE_SUGGESTIONS = [3000, 4500, 6000, 8000];
+
+/** Step 1 — photos. */
+export function PhotosStep() {
+  const photos = useListingDraftStore((state) => state.draft.photos);
+  const addPhoto = useListingDraftStore((state) => state.addPhoto);
+  const removePhoto = useListingDraftStore((state) => state.removePhoto);
+
+  return (
+    <View style={styles.block}>
+      <PhotoPickerGrid photos={photos} onAdd={addPhoto} onRemove={removePhoto} />
+      <Text variant="footnote" color="inkTertiary">
+        La primera foto será la portada. Muestra la entrada, el espacio y cómo se llega.
+      </Text>
+    </View>
+  );
+}
+
+/** Step 2 — location. */
+export function LocationStep() {
+  const draft = useListingDraftStore((state) => state.draft);
+  const setCoordinate = useListingDraftStore((state) => state.setCoordinate);
+
+  return (
+    <View style={styles.block}>
+      <MapStatic height={180} />
+
+      <Input
+        label="Dirección"
+        value={draft.address}
+        onChangeText={(address) =>
+          setCoordinate(draft.coordinate ?? { latitude: 4.6602, longitude: -74.0555 }, address, draft.zone)
+        }
+        placeholder="Carrera 15 # 85-32"
+        autoCapitalize="words"
+      />
+
+      <View style={styles.group}>
+        <Overline>Zona</Overline>
+        <View style={styles.chips}>
+          {ZONES.map((zone) => (
+            <Chip
+              key={zone}
+              label={zone}
+              selected={draft.zone === zone}
+              onPress={() =>
+                setCoordinate(
+                  draft.coordinate ?? { latitude: 4.6602, longitude: -74.0555 },
+                  draft.address,
+                  zone,
+                )
+              }
+            />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** Step 3 — name, type, description. */
+export function InfoStep() {
+  const draft = useListingDraftStore((state) => state.draft);
+  const setInfo = useListingDraftStore((state) => state.setInfo);
+
+  return (
+    <View style={styles.block}>
+      <Input
+        label="Nombre"
+        value={draft.name}
+        onChangeText={(name) => setInfo({ name })}
+        placeholder="Garaje Calle 85"
+        autoCapitalize="words"
+      />
+
+      <View style={styles.group}>
+        <Overline>Tipo</Overline>
+        <View style={styles.chips}>
+          {kindOrder.map((kind) => (
+            <Chip
+              key={kind}
+              label={kindCatalog[kind].label}
+              icon={kindCatalog[kind].icon}
+              selected={draft.kind === kind}
+              onPress={() => setInfo({ kind })}
+            />
+          ))}
+        </View>
+      </View>
+
+      <Input
+        label="Descripción"
+        value={draft.description}
+        onChangeText={(description) => setInfo({ description })}
+        placeholder="Cuenta cómo es el acceso, qué tan amplio es y qué lo hace cómodo."
+        multiline
+        numberOfLines={4}
+        style={styles.multiline}
+        hint="Dos o tres frases bastan."
+      />
+    </View>
+  );
+}
+
+/** Step 4 — features. */
+export function FeaturesStep() {
+  const features = useListingDraftStore((state) => state.draft.features);
+  const toggleFeature = useListingDraftStore((state) => state.toggleFeature);
+
+  return (
+    <View style={styles.block}>
+      <View style={styles.chips}>
+        {featureOrder.map((key) => (
+          <Chip
+            key={key}
+            label={featureCatalog[key].label}
+            icon={featureCatalog[key].icon}
+            showCheck
+            selected={features.includes(key)}
+            onPress={() => toggleFeature(key)}
+          />
+        ))}
+      </View>
+      <Text variant="footnote" color="inkTertiary">
+        Los conductores filtran por estas características.
+      </Text>
+    </View>
+  );
+}
+
+/** Step 5 — price. */
+export function PriceStep() {
+  const draft = useListingDraftStore((state) => state.draft);
+  const setPrice = useListingDraftStore((state) => state.setPrice);
+
+  return (
+    <View style={styles.block}>
+      <Input
+        label="Precio por hora"
+        value={draft.pricePerHour != null ? String(draft.pricePerHour) : ''}
+        onChangeText={(value) => setPrice(value ? Number(value.replace(/\D/g, '')) : null)}
+        placeholder="4500"
+        keyboardType="number-pad"
+        suffix="COP"
+      />
+
+      <View style={styles.chips}>
+        {PRICE_SUGGESTIONS.map((value) => (
+          <Chip
+            key={value}
+            label={formatCop(value)}
+            selected={draft.pricePerHour === value}
+            onPress={() => setPrice(value)}
+          />
+        ))}
+      </View>
+
+      <Input
+        label="Precio por día (opcional)"
+        value={draft.pricePerDay != null ? String(draft.pricePerDay) : ''}
+        onChangeText={(value) =>
+          setPrice(draft.pricePerHour, value ? Number(value.replace(/\D/g, '')) : null)
+        }
+        placeholder="32000"
+        keyboardType="number-pad"
+        suffix="COP"
+        hint="Si lo defines, se cobra el menor entre el total por horas y este valor."
+      />
+    </View>
+  );
+}
+
+/** Step 6 — opening hours. */
+export function HoursStep() {
+  const hours = useListingDraftStore((state) => state.draft.hours);
+  const setHours = useListingDraftStore((state) => state.setHours);
+
+  const opensAt = hours[0]?.opensAt ?? 6 * 60;
+  const closesAt = hours[0]?.closesAt ?? 22 * 60;
+
+  const update = (next: { opensAt?: number; closesAt?: number }) => {
+    setHours(hours.map((entry) => ({ ...entry, ...next })));
+  };
+
+  return (
+    <View style={styles.block}>
+      <View style={styles.times}>
+        <View style={styles.timeField}>
+          <TimeField label="Abre" value={opensAt} onChange={(value) => update({ opensAt: value })} />
+        </View>
+        <View style={styles.timeField}>
+          <TimeField
+            label="Cierra"
+            value={closesAt}
+            onChange={(value) => update({ closesAt: value })}
+            min={opensAt + 60}
+          />
+        </View>
+      </View>
+
+      <Text variant="footnote" color="inkTertiary">
+        Este horario aplica todos los días. Podrás ajustar días específicos desde la ficha del
+        parqueadero.
+      </Text>
+    </View>
+  );
+}
+
+/** Step 7 — capacity. */
+export function CapacityStep() {
+  const spots = useListingDraftStore((state) => state.draft.spotsTotal);
+  const setSpots = useListingDraftStore((state) => state.setSpots);
+  const value = spots ?? 1;
+
+  return (
+    <View style={styles.block}>
+      <Surface elevation="hairline" style={styles.stepper}>
+        <IconButton
+          icon={Minus}
+          tone="filled"
+          onPress={() => setSpots(Math.max(1, value - 1))}
+          disabled={value <= 1}
+          accessibilityLabel="Quitar un cupo"
+        />
+        <View style={styles.stepperValue}>
+          <Text variant="display">{value}</Text>
+          <Text variant="footnote" color="inkTertiary">
+            {value === 1 ? 'cupo' : 'cupos'}
+          </Text>
+        </View>
+        <IconButton
+          icon={Plus}
+          tone="filled"
+          onPress={() => setSpots(Math.min(400, value + 1))}
+          accessibilityLabel="Agregar un cupo"
+        />
+      </Surface>
+
+      <Text variant="footnote" color="inkTertiary">
+        Cuántos vehículos pueden estar al mismo tiempo.
+      </Text>
+    </View>
+  );
+}
+
+/** Step 8 — review. */
+export function ReviewStep() {
+  const draft = useListingDraftStore((state) => state.draft);
+
+  return (
+    <View style={styles.block}>
+      <Surface elevation="hairline" style={styles.review}>
+        <Text variant="title3">{draft.name || 'Sin nombre'}</Text>
+        <Text variant="subhead" color="inkSecondary">
+          {draft.address || 'Sin dirección'}
+          {draft.zone ? ` · ${draft.zone}` : ''}
+        </Text>
+
+        <View style={styles.reviewLines}>
+          <ReviewLine
+            label="Tarifa"
+            value={draft.pricePerHour != null ? `${formatCop(draft.pricePerHour)}/hora` : '—'}
+          />
+          <ReviewLine
+            label="Horario"
+            value={
+              draft.hours[0]
+                ? `${formatMinutes(draft.hours[0].opensAt)} – ${formatMinutes(draft.hours[0].closesAt)}`
+                : '—'
+            }
+          />
+          <ReviewLine label="Cupos" value={draft.spotsTotal != null ? String(draft.spotsTotal) : '—'} />
+          <ReviewLine label="Fotos" value={String(draft.photos.length)} />
+          <ReviewLine
+            label="Características"
+            value={draft.features.length > 0 ? String(draft.features.length) : 'Ninguna'}
+          />
+        </View>
+      </Surface>
+
+      <Text variant="footnote" color="inkTertiary">
+        Revisaremos tu parqueadero antes de publicarlo. Suele tomar menos de 24 horas.
+      </Text>
+    </View>
+  );
+}
+
+function ReviewLine({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.reviewLine}>
+      <Text variant="subhead" color="inkSecondary">
+        {label}
+      </Text>
+      <Text variant="subhead">{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  block: {
+    gap: space.lg,
+  },
+  group: {
+    gap: space.md,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
+  },
+  multiline: {
+    minHeight: 96,
+    textAlignVertical: 'top',
+  },
+  times: {
+    flexDirection: 'row',
+    gap: space.md,
+  },
+  timeField: {
+    flex: 1,
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: space.lg,
+  },
+  stepperValue: {
+    alignItems: 'center',
+  },
+  review: {
+    gap: space.sm,
+    padding: space.lg,
+    backgroundColor: palette.bg,
+    borderRadius: radius.md,
+  },
+  reviewLines: {
+    gap: space.sm,
+    marginTop: space.sm,
+  },
+  reviewLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.base,
+  },
+});
