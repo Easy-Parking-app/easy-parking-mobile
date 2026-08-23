@@ -44,7 +44,8 @@ para compilar los binarios de las tiendas.
 ### Lo que hay que aceptar
 
 - **Exige cuenta de facturación con tarjeta**, aunque el uso caiga en la capa
-  gratuita. Sin tarjeta no dan la API key.
+  gratuita. Sin tarjeta no dan la API key. (En nuestra cuenta ya estaba activa,
+  así que este paso no hizo falta.)
 - **Hay que poner límites el primer día**, no después: cuotas por API en Google
   Cloud y alertas de presupuesto. Es lo que evita una factura sorpresa si la
   geocodificación se dispara por un bug.
@@ -73,61 +74,83 @@ para compilar los binarios de las tiendas.
 
 ---
 
-## Cómo hacerlo
+## Lo que ya está hecho
 
-### 1. Obtener la clave
+La cuenta de Google Cloud ya está configurada. Para trabajar solo hace falta
+copiar `.env.example` a `.env.local` y pedir las claves.
 
-1. <https://console.cloud.google.com/> → crear proyecto `easy-parking`.
-2. Activar facturación (pide tarjeta).
-3. **APIs & Services → Enable APIs** → habilitar *Maps SDK for Android* y
-   *Maps SDK for iOS*. Nada más por ahora: cada API habilitada es superficie
-   que puede generar cobro.
-4. **Credentials → Create credentials → API key**.
+| | |
+|---|---|
+| Proyecto GCP | `Easy Parking` (`project-bb24b33c-cba3-4349-bb5`) |
+| APIs habilitadas | *Maps SDK for Android*, *Maps SDK for iOS*, y nada más |
+| Clave Android | `Easy Parking - Android`, restringida a *Maps SDK for Android* |
+| Clave iOS | `Easy Parking - iOS`, restringida a *Maps SDK for iOS* + bundle `app.easyparking.mobile` |
+| Credenciales | <https://console.cloud.google.com/apis/credentials?project=project-bb24b33c-cba3-4349-bb5> |
 
-### 2. Restringir la clave antes de usarla
+**Son dos claves y no una a propósito**: una clave de Google admite un solo tipo
+de restricción de aplicación, así que Android e iOS no pueden compartirla si
+queremos las dos restringidas.
 
-Esto no es opcional. Una clave abierta la puede usar cualquiera y la factura
-llega a nosotros.
+`react-native-maps` ya está instalado (1.20.1, la versión que corresponde a
+Expo SDK 54, incluida en Expo Go).
 
-- **Application restrictions**
-  - Android: *Android apps* → package `app.easyparking.mobile` + huella SHA-1
-    del certificado (la da `eas credentials`).
-  - iOS: *iOS apps* → bundle ID `app.easyparking.mobile`.
-- **API restrictions** → solo los dos SDK de mapas.
+### Lo que falta cerrar en la consola
 
-### 3. Poner un techo de gasto
+- **Restricción de aplicación en la clave de Android.** Quedó en *Ninguno*
+  porque hace falta la huella SHA-1 del certificado de firma, y esa no existe
+  hasta la primera compilación. Cuando la haya:
 
-En **Billing → Budgets & alerts**, presupuesto con avisos al 50 %, 90 % y 100 %.
-Y en **APIs & Services → Quotas**, un tope diario de peticiones por API. El
-presupuesto avisa; la cuota es la que de verdad corta.
+  ```bash
+  eas credentials
+  ```
 
-### 4. Configurar el proyecto
+  y en la consola: la clave → *Restricciones de aplicaciones* → *Apps para
+  Android* → package `app.easyparking.mobile` + la huella.
 
-La clave no se escribe en el código:
+  Mientras tanto el riesgo es acotado: la clave solo puede llamar al *Maps SDK
+  for Android*, que **no factura**. Aunque se filtrara, no genera cobro.
+
+- **Presupuesto y alertas.** En **Billing → Budgets & alerts**, un presupuesto
+  con avisos al 50 %, 90 % y 100 %. No es urgente hoy —ninguna API de pago está
+  habilitada—, pero sí el día que se active geocodificación.
+
+- **Borrar la clave sobrante.** Al habilitar los SDK, Google creó sola una
+  `Maps Platform API Key` abierta a 35 APIs. No la usa nadie. Conviene borrarla
+  desde la página de credenciales.
+
+## Cómo se configuró en el proyecto
+
+Las claves llegan por entorno y **no están en ningún archivo versionado**:
 
 ```bash
 # .env.local  (ignorado por git)
-EXPO_PUBLIC_GOOGLE_MAPS_KEY=la_clave
+EXPO_PUBLIC_GOOGLE_MAPS_KEY_ANDROID=...
+EXPO_PUBLIC_GOOGLE_MAPS_KEY_IOS=...
 ```
+
+`react-native-maps` **no trae config plugin**, así que las claves no se
+configuran con una entrada en `plugins`. Van en `ios.config.googleMapsApiKey` y
+`android.config.googleMaps.apiKey`. Como `app.json` no puede leer variables de
+entorno, existe [`app.config.ts`](../app.config.ts): extiende el JSON e inyecta
+esos dos valores. Comprobar el resultado con
 
 ```bash
-eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_KEY --value la_clave
+npx expo config --type prebuild
 ```
 
-En `app.json`:
+(`--type public` las omite a propósito: ese manifiesto es el que ven los
+clientes.)
 
-```json
-["react-native-maps", {
-  "androidGoogleMapsApiKey": "$EXPO_PUBLIC_GOOGLE_MAPS_KEY",
-  "iosGoogleMapsApiKey": "$EXPO_PUBLIC_GOOGLE_MAPS_KEY"
-}]
-```
+Para compilar en la nube hay que subirlas también a EAS:
 
 ```bash
-npx expo install react-native-maps
+eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_KEY_ANDROID --value la_clave
+eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_KEY_IOS     --value la_clave
 ```
 
-### 5. Escribir el componente
+## Lo que falta: el componente
+
+### 1. Escribir el componente
 
 Un solo archivo, `src/components/map/MapGoogleView.tsx`, que cumpla
 `MapViewProps`:
@@ -141,7 +164,7 @@ Un solo archivo, `src/components/map/MapGoogleView.tsx`, que cumpla
 - La pasada que separa marcadores solapados se puede quitar: conviene pasar a
   *clustering* real.
 
-### 6. Estilo — importante para no perder la identidad
+### 2. Estilo — importante para no perder la identidad
 
 El estilo por defecto de Google es saturado y compite con nuestras píldoras de
 precio. Hay que desaturarlo con `customMapStyle`: un JSON que baje la saturación,
@@ -152,7 +175,7 @@ parques.
 Sin ese paso el mapa se ve como cualquier otra app y perdemos lo que más
 distingue la pantalla principal.
 
-### 7. Conservar el mapa dibujado para web
+### 3. Conservar el mapa dibujado para web
 
 `react-native-maps` no soporta web. En `index.ts`:
 
