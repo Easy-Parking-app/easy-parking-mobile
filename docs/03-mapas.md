@@ -157,14 +157,32 @@ La elección se hace por extensión de plataforma, no con un `Platform.OS` en
 tiempo de ejecución:
 
 ```
-index.ts      → MapGoogleView   (iOS, Android)
-index.web.ts  → MapCanvas       (web)
+MapViewImpl.ts      → MapGoogleView   (iOS, Android)
+MapViewImpl.web.ts  → MapCanvas       (web)
 ```
 
 Tiene que ser así: `react-native-maps` es solo nativo y **basta con importarlo**
 para romper el bundle de web, aunque nunca se renderice. Con archivos separados
 Metro ni siquiera lo mira. Comprobado: el bundle de web no contiene una sola
 referencia a la librería.
+
+La elección vive en `MapViewImpl` y no en `index.ts` porque `MapStatic` también
+necesita el mapa, y pedírselo a `index` —que a su vez exporta `MapStatic`— sería
+una importación circular.
+
+### Qué sabe señalar el mapa
+
+Tres cosas distintas, y conviene no confundirlas:
+
+| | Qué es | Componente |
+|---|---|---|
+| `markers` | Parqueaderos publicados, con precio | `PriceMarker` |
+| `pin` | Un sitio que alguien está eligiendo | `PlacePin` |
+| `userLocation` | Dónde está el conductor | `UserDot` |
+
+`showsUser={false}` apaga el tercero, para los mapas que no hablan del
+conductor —elegir la ubicación de un parqueadero, por ejemplo—, y
+`onPressCoordinate` devuelve la coordenada tocada.
 
 ### Tres cosas que conviene no romper
 
@@ -174,6 +192,18 @@ subir al mapa nativo; con veinte marcadores animando a la vez, Android se
 arrastra. Pero apagarlo del todo congela el marcador en su primer frame y la
 selección no se vería. Se deja encendido solo mientras dura el muelle de
 `PriceMarker` (450 ms) y se apaga solo.
+
+**1 bis. Ese mismo mecanismo es el que cortaba las píldoras.** Android no
+dibuja la vista del marcador: la rasteriza a un bitmap **del tamaño que la
+vista mide**. Lo que se salga de esa medida se recorta, y aquí se salía
+bastante —la sombra cae unos 16 px, y el seleccionado crece un 10 % y sube 4—.
+Por eso `MARKER_BLEED` añade un margen transparente alrededor: la vista mide de
+más y el bitmap tiene sitio para todo.
+
+Si algún día el marcador vuelve a salir cortado, el sospechoso es ese margen,
+no el mapa. Y el anclaje se calcula desde el alto real del marcador
+(`PRICE_MARKER_HEIGHT`): fijarlo a 1 haría que la punta del pico dejara de
+señalar el sitio en cuanto el margen cambie.
 
 **2. El punto del conductor va congelado a propósito.** `UserDot` late en bucle;
 seguir sus cambios re-rasterizaría el marcador para siempre. Se pierde el pulso
@@ -186,17 +216,32 @@ compitan por el mismo toque.
 
 ### El estilo
 
-[`googleMapStyle.ts`](../src/components/map/googleMapStyle.ts) desatura el mapa
-hasta el mismo lenguaje que dibuja `MapBackdrop`: tierra gris muy claro, vías
-blancas, agua apagada, verde solo en parques.
+[`googleMapStyle.ts`](../src/components/map/googleMapStyle.ts) resuelve dos
+problemas, en este orden.
 
-Lo más importante que hace es **apagar los pines de comercios de Google**, que
-competían directamente con nuestras píldoras de precio. Sin ese paso el mapa se
-ve como cualquier otra app y perdemos lo que más distingue la pantalla
-principal.
+**Primero**, apaga los pines de comercios de Google, que competían directamente
+con nuestras píldoras de precio. Sin ese paso el mapa se ve como cualquier otra
+app y perdemos lo que más distingue la pantalla principal.
 
-Los colores salen de los tokens `mapLand`, `mapWater`, `mapPark`, `mapRoad`,
-`mapRoadMinor` y `mapLabel` de `theme.ts`. No se escribe un hex a mano.
+**Segundo**, y esto costó una iteración: desaturarlo hasta el blanco es pasarse
+de largo. Un mapa casi blanco se ve limpio en una captura y **plano en la
+mano**, porque las vías desaparecen contra el fondo y no queda de dónde
+agarrarse para orientarse.
+
+El punto medio es una ciudad legible:
+
+- La tierra es más oscura que el blanco de la app, para que las vías blancas
+  resalten **por contraste y no por brillo**.
+- `landscape.man_made` pinta las manzanas un escalón más oscuras. Es la capa
+  que más hace por que el mapa no se vea vacío: sin ella, entre vía y vía no
+  hay nada.
+- La jerarquía de vías va por color, no por grosor —que a este zoom no se
+  distingue—: local fundida con la tierra, arteria blanca, autopista en ámbar.
+- El agua es azul y los parques verdes. Poco color, puesto donde informa.
+
+Los valores salen de los tokens `map*` de `theme.ts`. No se escribe un hex a
+mano, y como son compartidos, el mapa dibujado de web y los recortes de las
+fichas heredan lo mismo.
 
 ### Decisiones de encuadre
 
