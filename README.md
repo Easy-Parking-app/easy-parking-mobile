@@ -31,6 +31,7 @@ Las claves solo hacen falta para el mapa nativo y para hablar con Supabase.
 | `npm run web` | Abre la versión web |
 | `npm run typecheck` | `tsc --noEmit` — debe pasar antes de cada commit |
 | `npm run types:supabase` | Regenera `src/types/database.ts` desde el esquema |
+| `npm run build:apk` | APK de prueba en la nube (EAS). Ver [`docs/05-compilar.md`](docs/05-compilar.md) |
 
 El proyecto está fijado a **Expo SDK 54**, que es la versión que soporta el Expo
 Go publicado en las tiendas. Ver [`docs/01-arquitectura.md`](docs/01-arquitectura.md#versión-del-sdk-y-expo-go)
@@ -73,6 +74,7 @@ Documentación detallada en [`docs/`](docs/):
 - [`02-design-system.md`](docs/02-design-system.md) — identidad visual y tokens
 - [`03-mapas.md`](docs/03-mapas.md) — plan para pasar a mapas reales y qué proveedor usar
 - [`04-supabase.md`](docs/04-supabase.md) — el proyecto, el esquema y cómo conectar los servicios
+- [`05-compilar.md`](docs/05-compilar.md) — sacar un APK para enseñar la app
 
 ---
 

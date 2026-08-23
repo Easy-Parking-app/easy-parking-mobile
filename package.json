@@ -43,7 +43,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "types:supabase": "supabase gen types typescript --project-id ptkgshahkvqgxkzbjgke > src/types/database.ts"
+    "types:supabase": "supabase gen types typescript --project-id ptkgshahkvqgxkzbjgke > src/types/database.ts",
+    "build:apk": "eas build --platform android --profile preview",
+    "build:apk:status": "eas build:list --platform android --limit 5"
   },
   "private": true
 }
