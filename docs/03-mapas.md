@@ -148,43 +148,72 @@ eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_KEY_ANDROID --value la_clave
 eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_KEY_IOS     --value la_clave
 ```
 
-## Lo que falta: el componente
+## El componente
 
-### 1. Escribir el componente
+Ya está escrito: [`MapGoogleView.tsx`](../src/components/map/MapGoogleView.tsx).
+Cumple `MapViewProps`, así que **ninguna pantalla cambió**.
 
-Un solo archivo, `src/components/map/MapGoogleView.tsx`, que cumpla
-`MapViewProps`:
+La elección se hace por extensión de plataforma, no con un `Platform.OS` en
+tiempo de ejecución:
 
-- `provider={PROVIDER_GOOGLE}` en el `MapView`.
-- `markers` → `<Marker>` con el `PriceMarker` que ya existe como hijo
-  (`tracksViewChanges={false}` después del primer render, o los marcadores
-  personalizados destrozan el rendimiento en Android).
-- `focus` → `mapRef.animateCamera({ center }, { duration })`, con `topInset` y
-  `bottomInset` como `mapPadding` para que el marcador no quede tras la hoja.
-- La pasada que separa marcadores solapados se puede quitar: conviene pasar a
-  *clustering* real.
-
-### 2. Estilo — importante para no perder la identidad
-
-El estilo por defecto de Google es saturado y compite con nuestras píldoras de
-precio. Hay que desaturarlo con `customMapStyle`: un JSON que baje la saturación,
-deje las vías en blanco y reduzca los POI. La referencia es lo que ya dibuja
-`MapBackdrop`: gris claro, vías blancas, etiquetas discretas, verde solo en
-parques.
-
-Sin ese paso el mapa se ve como cualquier otra app y perdemos lo que más
-distingue la pantalla principal.
-
-### 3. Conservar el mapa dibujado para web
-
-`react-native-maps` no soporta web. En `index.ts`:
-
-```ts
-import { Platform } from 'react-native';
-export const MapView = Platform.OS === 'web' ? MapCanvas : MapGoogleView;
+```
+index.ts      → MapGoogleView   (iOS, Android)
+index.web.ts  → MapCanvas       (web)
 ```
 
-Así la versión web sigue funcionando y no perdemos la superficie de QA rápida.
+Tiene que ser así: `react-native-maps` es solo nativo y **basta con importarlo**
+para romper el bundle de web, aunque nunca se renderice. Con archivos separados
+Metro ni siquiera lo mira. Comprobado: el bundle de web no contiene una sola
+referencia a la librería.
+
+### Tres cosas que conviene no romper
+
+**1. `tracksViewChanges` es lo que separa un mapa fluido de uno inservible.**
+Mientras está activo, cada frame del marcador se re-rasteriza y se vuelve a
+subir al mapa nativo; con veinte marcadores animando a la vez, Android se
+arrastra. Pero apagarlo del todo congela el marcador en su primer frame y la
+selección no se vería. Se deja encendido solo mientras dura el muelle de
+`PriceMarker` (450 ms) y se apaga solo.
+
+**2. El punto del conductor va congelado a propósito.** `UserDot` late en bucle;
+seguir sus cambios re-rasterizaría el marcador para siempre. Se pierde el pulso
+y se gana un mapa que no se traba. Es un intercambio consciente, no un olvido.
+
+**3. El toque lo atiende el `<Marker>`, no el `Pressable` de dentro.** En
+Android los gestos sobre vistas anidadas en un marcador nativo se pierden a
+menudo; el `PriceMarker` va envuelto en `pointerEvents="none"` para que no
+compitan por el mismo toque.
+
+### El estilo
+
+[`googleMapStyle.ts`](../src/components/map/googleMapStyle.ts) desatura el mapa
+hasta el mismo lenguaje que dibuja `MapBackdrop`: tierra gris muy claro, vías
+blancas, agua apagada, verde solo en parques.
+
+Lo más importante que hace es **apagar los pines de comercios de Google**, que
+competían directamente con nuestras píldoras de precio. Sin ese paso el mapa se
+ve como cualquier otra app y perdemos lo que más distingue la pantalla
+principal.
+
+Los colores salen de los tokens `mapLand`, `mapWater`, `mapPark`, `mapRoad`,
+`mapRoadMinor` y `mapLabel` de `theme.ts`. No se escribe un hex a mano.
+
+### Decisiones de encuadre
+
+Abre a **~5 km** (`LATITUDE_DELTA = 0.045`), más cerrado que los ~10 km del mapa
+dibujado. Con tiles reales esa amplitud deja de ayudar: aparecen calles y
+etiquetas de media ciudad y los marcadores se pierden entre el ruido.
+
+Rotar e inclinar están desactivados: no aportan nada aquí y descuadran las
+etiquetas.
+
+### Lo que queda por mejorar
+
+- **Clustering.** La pasada que separa marcadores solapados vive en `MapCanvas`
+  y no se trasladó. Con muchos parqueaderos en una manzana, aquí se apilarán.
+  Lo correcto es *clustering* real, no seguir empujándolos.
+- **Probarlo en un teléfono.** Los bundles compilan, pero el mapa nativo no se
+  puede validar en el navegador. Hay que escanear el QR con Expo Go.
 
 ---
 

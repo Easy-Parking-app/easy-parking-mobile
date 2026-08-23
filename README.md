@@ -51,7 +51,7 @@ app/                    Rutas (expo-router). Solo composición, sin lógica.
   propietario/          Modo propietario (stack propio)
 src/
   components/ui/        Sistema de diseño: Text, Button, Chip, Row, Sheet…
-  components/map/       Abstracción de mapa (hoy un mapa dibujado)
+  components/map/       Abstracción de mapa (Google en móvil, dibujado en web)
   components/parking/   Fila, tarjeta de vista previa, galería, reseñas
   components/booking/   Fecha, hora, resumen de precio, métodos de pago
   components/owner/     Pasos de publicación, gráfico de ingresos
@@ -95,7 +95,7 @@ Documentación detallada en [`docs/`](docs/):
 - 🟡 Backend: el proyecto de Supabase existe y la base ya tiene esquema, RLS y
   las funciones de reservar/cancelar. **Ninguna pantalla lo usa todavía**: los
   servicios siguen leyendo de `src/mocks`. Ver [`docs/04-supabase.md`](docs/04-supabase.md).
-- 🟡 Mapas: claves de Google Maps creadas y conectadas, `react-native-maps`
-  instalado. Falta escribir el componente. Ver [`docs/03-mapas.md`](docs/03-mapas.md).
+- ✅ Mapas: mapa real de Google en iOS y Android, con estilo propio; el mapa
+  dibujado se conserva para web. Ver [`docs/03-mapas.md`](docs/03-mapas.md).
 - ⏳ Pendiente: autenticación (no hay pantallas de login), Storage para las fotos,
   pagos reales, notificaciones, verificación de llegada con fotos.
