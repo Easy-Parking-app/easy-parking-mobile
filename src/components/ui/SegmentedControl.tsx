@@ -6,7 +6,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { motion, palette, radius, space } from '@/constants/theme';
+import { layout, motion, palette, radius, space } from '@/constants/theme';
 import { Text } from './Text';
 
 export type Segment<T extends string> = {
@@ -60,6 +60,10 @@ export function SegmentedControl<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={segment.label}
+            // El segmento mide 34 pt de alto dentro de una pista de 40. El
+            // hitSlop lo lleva a los 44 pt de área táctil sin engordar el
+            // control, que a 44 de alto parecería un botón y no un selector.
+            hitSlop={{ top: TOUCH_SLOP, bottom: TOUCH_SLOP }}
             style={styles.segment}
           >
             <Text
@@ -78,6 +82,8 @@ export function SegmentedControl<T extends string>({
 }
 
 const PADDING = 3;
+const TRACK_HEIGHT = 40;
+const TOUCH_SLOP = (layout.hitSlopMin - (TRACK_HEIGHT - 2 * PADDING)) / 2;
 
 const styles = StyleSheet.create({
   track: {
@@ -85,7 +91,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface,
     borderRadius: radius.sm,
     padding: PADDING,
-    height: 40,
+    height: TRACK_HEIGHT,
   },
   indicator: {
     position: 'absolute',

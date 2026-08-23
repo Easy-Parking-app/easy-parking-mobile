@@ -46,6 +46,16 @@ const heights: Record<ButtonSize, number> = {
   lg: layout.controlHeight.lg,
 };
 
+/**
+ * Cuánto ampliar el área táctil para llegar al mínimo de 44 pt.
+ *
+ * El tamaño `sm` mide 36 y se queda corto. Engordarlo visualmente lo
+ * convertiría en un botón mediano y perdería su razón de ser, así que se separa
+ * lo que se ve de lo que se toca. Los tamaños que ya llegan devuelven 0.
+ */
+const touchSlop = (size: ButtonSize) =>
+  Math.max(0, (layout.hitSlopMin - heights[size]) / 2);
+
 const paddings: Record<ButtonSize, number> = {
   sm: space.md,
   md: space.base,
@@ -85,6 +95,7 @@ export function Button({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inactive, busy: loading }}
       testID={testID}
+      hitSlop={{ top: touchSlop(size), bottom: touchSlop(size) }}
       style={[
         styles.base,
         {

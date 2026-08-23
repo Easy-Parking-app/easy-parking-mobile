@@ -2,7 +2,7 @@ import { StyleSheet, View, type ViewStyle } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { Check } from 'lucide-react-native';
 
-import { palette, radius, space } from '@/constants/theme';
+import { layout, palette, radius, space } from '@/constants/theme';
 import { PressableScale } from './PressableScale';
 import { Text } from './Text';
 
@@ -16,6 +16,16 @@ export type ChipProps = {
   disabled?: boolean;
   style?: ViewStyle;
 };
+
+/** Alto visual. Ver `TOUCH_SLOP` para por qué no es también el táctil. */
+const HEIGHT = 36;
+
+/**
+ * Una píldora de 44 pt de alto se ve pesada en una fila de filtros, pero 36 pt
+ * quedan por debajo del mínimo táctil que exige el proyecto. El `hitSlop`
+ * separa las dos cosas: se ve de 36 y se toca como si midiera 44.
+ */
+const TOUCH_SLOP = (layout.hitSlopMin - HEIGHT) / 2;
 
 /**
  * Selection state reads three ways at once — fill, border and label colour —
@@ -39,6 +49,7 @@ export function Chip({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected, disabled }}
+      hitSlop={{ top: TOUCH_SLOP, bottom: TOUCH_SLOP }}
       style={[
         styles.base,
         {
@@ -64,7 +75,7 @@ export function Chip({
 
 const styles = StyleSheet.create({
   base: {
-    height: 36,
+    height: HEIGHT,
     paddingHorizontal: space.md,
     borderRadius: radius.pill,
     borderWidth: 1,
