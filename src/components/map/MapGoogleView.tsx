@@ -6,6 +6,7 @@ import MapView, { Marker, PROVIDER_GOOGLE, type MapPressEvent } from 'react-nati
 import { motion } from '@/constants/theme';
 import { hapticsEnabled } from '@/store/useSettingsStore';
 import type { LatLng } from '@/types';
+import { formatCop } from '@/utils/format';
 import { googleMapStyle } from './googleMapStyle';
 import { PLACE_PIN_HEIGHT, PlacePin } from './PlacePin';
 import { PRICE_MARKER_HEIGHT, PriceMarker } from './PriceMarker';
@@ -21,14 +22,17 @@ import { UserDot } from './UserDot';
  */
 
 /**
- * Alto visible del mapa, en grados de latitud. ~5 km.
+ * Zoom inicial. 14 deja ver algo mas de un kilometro de ancho: suficiente para
+ * comparar entre manzanas vecinas, que es lo que hace quien busca parqueadero.
  *
- * Mas cerrado que el mapa dibujado, que abre a unos 10 km. Con tiles reales esa
- * amplitud deja de ayudar: aparecen calles y etiquetas de media ciudad y los
- * marcadores de precio se pierden entre el ruido. A 5 km todavia se compara
- * entre barrios vecinos, que es lo que hace el conductor.
+ * Va como zoom y no como `latitudeDelta` a proposito. Una region se define por
+ * cuantos grados tiene que caber en la pantalla, pero `mapPadding` reserva aqui
+ * mas de la mitad del alto —controles arriba, hoja abajo—, asi que el mapa
+ * tenia que alejarse muchisimo para meter esos grados en la franja que queda.
+ * El resultado era Bogota entera y La Calera al fondo. El zoom no depende del
+ * tamano de la franja, asi que no sufre ese efecto.
  */
-const LATITUDE_DELTA = 0.045;
+const INITIAL_ZOOM = 14;
 
 /**
  * Cuanto tiempo se deja al marcador "vivo" tras cambiar de estado.
@@ -49,16 +53,34 @@ const TRACK_WINDOW = 450;
  * Margen invisible alrededor del marcador.
  *
  * Android no dibuja la vista del marcador: la rasteriza a un bitmap del tamaño
- * que la vista mide y sube ese bitmap al mapa. Todo lo que se salga de esa
- * medida se recorta — y aquí se sale bastante: la sombra `raised` cae unos
- * 16 px, y el seleccionado crece un 10 % y sube 4 px.
- *
- * Sin este margen las píldoras salen cortadas. Con él, la vista mide de más y
- * el bitmap tiene sitio para todo. No se ve porque es transparente.
+ * que la vista mide y sube ese bitmap al mapa. La sombra `raised` cae unos
+ * 16 px y el seleccionado crece un 10 %, así que sin margen eso se recorta.
  */
 const MARKER_BLEED = 16;
 
 const MARKER_TOTAL_HEIGHT = PRICE_MARKER_HEIGHT + MARKER_BLEED * 2;
+
+/**
+ * Ancho del contenedor del marcador, calculado del texto.
+ *
+ * Aquí estaba el recorte de verdad. Un margen no bastaba: dentro de un
+ * `<Marker>` de Android la vista se mide con un ancho disponible que no
+ * corresponde a su contenido, y la píldora acababa comprimida hasta que el
+ * `numberOfLines={1}` del precio lo cortaba con puntos suspensivos —"$ 8.." en
+ * vez de "$ 8.000"—. No era el bitmap: era el texto, truncado antes de pintarse.
+ *
+ * Fijar el ancho quita la ambigüedad. Se estima del número de caracteres y se
+ * redondea hacia arriba a propósito: **pasarse es gratis** —el contenedor es
+ * transparente y la píldora va centrada, así que el anclaje sigue señalando el
+ * mismo punto— mientras que quedarse corto vuelve a cortar el precio.
+ */
+const CHAR_WIDTH = 9;
+/** Padding horizontal de la píldora más su borde. */
+const PILL_CHROME = 28;
+const MIN_PILL_WIDTH = 62;
+
+const markerWidth = (label: string) =>
+  Math.max(MIN_PILL_WIDTH, label.length * CHAR_WIDTH + PILL_CHROME) + MARKER_BLEED * 2;
 
 /**
  * Anclaje del marcador, en fracción de su alto.
@@ -116,9 +138,15 @@ const PriceAnnotation = memo(function PriceAnnotation({
         los gestos sobre vistas anidadas en un marcador nativo se pierden a
         menudo. `pointerEvents="none"` evita que compitan por el mismo toque.
 
-        El padding es el margen que necesita la rasterizacion: ver MARKER_BLEED.
+        El tamano es explicito: ver markerWidth.
       */}
-      <View pointerEvents="none" style={styles.markerBleed}>
+      <View
+        pointerEvents="none"
+        style={[
+          styles.markerBox,
+          { width: markerWidth(formatCop(marker.price)), height: MARKER_TOTAL_HEIGHT },
+        ]}
+      >
         <PriceMarker
           price={marker.price}
           selected={selected}
@@ -133,6 +161,8 @@ const PriceAnnotation = memo(function PriceAnnotation({
 
 const PIN_TOTAL_HEIGHT = PLACE_PIN_HEIGHT + MARKER_BLEED * 2;
 const PIN_ANCHOR_Y = (MARKER_BLEED + PLACE_PIN_HEIGHT) / PIN_TOTAL_HEIGHT;
+/** La cabeza del pin mide 34; el resto es margen para la sombra. */
+const PIN_WIDTH = 34 + MARKER_BLEED * 2;
 
 /**
  * Pin del sitio elegido.
@@ -159,7 +189,10 @@ const PinAnnotation = memo(function PinAnnotation({ coordinate }: { coordinate: 
       zIndex={3}
       accessibilityLabel="Ubicación elegida"
     >
-      <View pointerEvents="none" style={styles.markerBleed}>
+      <View
+        pointerEvents="none"
+        style={[styles.markerBox, { width: PIN_WIDTH, height: PIN_TOTAL_HEIGHT }]}
+      >
         <PlacePin />
       </View>
     </Marker>
@@ -212,10 +245,13 @@ export function MapGoogleView({
       // Maps, para que el mapa se vea igual en las dos plataformas.
       provider={PROVIDER_GOOGLE}
       customMapStyle={googleMapStyle}
-      initialRegion={{
-        ...userLocation,
-        latitudeDelta: LATITUDE_DELTA,
-        longitudeDelta: LATITUDE_DELTA * 0.6,
+      initialCamera={{
+        center: userLocation,
+        zoom: INITIAL_ZOOM,
+        pitch: 0,
+        heading: 0,
+        // Lo usa iOS; Android se queda con `zoom`.
+        altitude: 0,
       }}
       // Empuja el centro de la camara fuera de las zonas tapadas por los
       // controles flotantes y por la hoja inferior. Sin esto, el parqueadero
@@ -267,7 +303,10 @@ export function MapGoogleView({
 }
 
 const styles = StyleSheet.create({
-  markerBleed: {
-    padding: MARKER_BLEED,
+  // Tamaño explícito y contenido centrado: el marcador nunca depende de cómo
+  // Android decida medirlo dentro del <Marker>.
+  markerBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
