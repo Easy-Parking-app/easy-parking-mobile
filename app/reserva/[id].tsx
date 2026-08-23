@@ -145,7 +145,7 @@ export default function BookingDetailScreen() {
 
         <View style={styles.group}>
           <Overline>Ubicación</Overline>
-          <MapStatic height={150} />
+          <MapStatic coordinate={booking.parking.coordinate} height={150} />
           <Line icon={MapPin} label={booking.parking.address} />
           <Row
             icon={Route}

@@ -202,7 +202,7 @@ export default function ParkingDetailScreen() {
           </Section>
 
           <Section title="Ubicación" icon={MapPin}>
-            <MapStatic height={150} />
+            <MapStatic coordinate={parking.coordinate} height={150} />
             <Text variant="footnote" color="inkTertiary">
               La dirección exacta se comparte al confirmar la reserva.
             </Text>

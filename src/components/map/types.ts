@@ -31,5 +31,26 @@ export type MapViewProps = {
   /** Extra top inset so markers are not hidden behind floating controls. */
   topInset?: number;
   interactive?: boolean;
+  /**
+   * Tocar el mapa devuelve la coordenada tocada.
+   *
+   * Lo usa el asistente de publicación para colocar el punto del parqueadero.
+   * Es opcional porque la pantalla principal no lo necesita: allí un toque en
+   * el mapa solo deselecciona.
+   */
+  onPressCoordinate?: (coordinate: LatLng) => void;
+  /**
+   * Punto suelto, sin precio ni selección: el sitio que alguien está eligiendo.
+   *
+   * Distinto de `markers`, que son parqueaderos publicados y se pintan como
+   * píldoras de precio. Aquí todavía no hay precio que mostrar.
+   */
+  pin?: LatLng | null;
+  /**
+   * Dibujar el punto del conductor. Se apaga cuando el mapa no habla de dónde
+   * está el conductor sino de dónde está otra cosa —elegir la ubicación de un
+   * parqueadero, por ejemplo—, donde ese punto solo confunde.
+   */
+  showsUser?: boolean;
   style?: StyleProp<ViewStyle>;
 };

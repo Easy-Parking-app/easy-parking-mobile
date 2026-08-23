@@ -9,8 +9,9 @@ import Animated, {
 
 import { motion, palette } from '@/constants/theme';
 import type { LatLng } from '@/types';
-import { project, type Region } from '@/utils/geo';
+import { project, unproject, type Region } from '@/utils/geo';
 import { MapBackdrop } from './MapBackdrop';
+import { PLACE_PIN_HEIGHT, PlacePin } from './PlacePin';
 import { PriceMarker } from './PriceMarker';
 import type { MapViewProps } from './types';
 import { UserDot } from './UserDot';
@@ -36,6 +37,9 @@ export function MapCanvas({
   bottomInset = 0,
   topInset = 0,
   interactive = true,
+  onPressCoordinate,
+  pin,
+  showsUser = true,
   style,
 }: MapViewProps) {
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -164,6 +168,7 @@ export function MapCanvas({
   }));
 
   const userPoint = toPoint(userLocation);
+  const pinPoint = pin ? toPoint(pin) : null;
 
   return (
     <View style={[styles.root, style]} onLayout={onLayout}>
@@ -175,17 +180,43 @@ export function MapCanvas({
             {/* Tapping empty map clears the selection, like Maps does. */}
             <Pressable
               style={StyleSheet.absoluteFill}
-              onPress={() => onSelectMarker(null)}
+              onPress={(event) => {
+                onSelectMarker(null);
+                if (!onPressCoordinate) return;
+                // Este Pressable vive dentro de la capa del mundo, así que
+                // locationX/Y ya vienen en coordenadas de mundo: el paneo está
+                // aplicado como transform del padre y no hay que restarlo.
+                const { locationX, locationY } = event.nativeEvent;
+                onPressCoordinate(
+                  unproject({ x: locationX, y: locationY }, region, world),
+                );
+              }}
               accessibilityRole="none"
               accessible={false}
             />
 
-            <View
-              style={[styles.pin, { left: userPoint.x - 22, top: userPoint.y - 22 }]}
-              pointerEvents="none"
-            >
-              <UserDot />
-            </View>
+            {showsUser ? (
+              <View
+                style={[styles.pin, { left: userPoint.x - 22, top: userPoint.y - 22 }]}
+                pointerEvents="none"
+              >
+                <UserDot />
+              </View>
+            ) : null}
+
+            {pinPoint ? (
+              <View
+                style={[
+                  styles.pin,
+                  // La punta del pin es lo que señala, así que se descuelga el
+                  // alto completo hacia arriba desde el punto.
+                  { left: pinPoint.x - 17, top: pinPoint.y - PLACE_PIN_HEIGHT },
+                ]}
+                pointerEvents="none"
+              >
+                <PlacePin />
+              </View>
+            ) : null}
 
             {placed.map(({ marker, x, y }) => {
               const selected = marker.id === selectedId;

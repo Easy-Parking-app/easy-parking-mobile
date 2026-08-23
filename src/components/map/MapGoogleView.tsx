@@ -1,12 +1,14 @@
 import * as Haptics from 'expo-haptics';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, type MapPressEvent } from 'react-native-maps';
 
 import { motion } from '@/constants/theme';
 import { hapticsEnabled } from '@/store/useSettingsStore';
+import type { LatLng } from '@/types';
 import { googleMapStyle } from './googleMapStyle';
-import { PriceMarker } from './PriceMarker';
+import { PLACE_PIN_HEIGHT, PlacePin } from './PlacePin';
+import { PRICE_MARKER_HEIGHT, PriceMarker } from './PriceMarker';
 import type { MapMarker, MapViewProps } from './types';
 import { UserDot } from './UserDot';
 
@@ -42,6 +44,30 @@ const LATITUDE_DELTA = 0.045;
  * margen.
  */
 const TRACK_WINDOW = 450;
+
+/**
+ * Margen invisible alrededor del marcador.
+ *
+ * Android no dibuja la vista del marcador: la rasteriza a un bitmap del tamaño
+ * que la vista mide y sube ese bitmap al mapa. Todo lo que se salga de esa
+ * medida se recorta — y aquí se sale bastante: la sombra `raised` cae unos
+ * 16 px, y el seleccionado crece un 10 % y sube 4 px.
+ *
+ * Sin este margen las píldoras salen cortadas. Con él, la vista mide de más y
+ * el bitmap tiene sitio para todo. No se ve porque es transparente.
+ */
+const MARKER_BLEED = 16;
+
+const MARKER_TOTAL_HEIGHT = PRICE_MARKER_HEIGHT + MARKER_BLEED * 2;
+
+/**
+ * Anclaje del marcador, en fracción de su alto.
+ *
+ * Lo que señala la ubicación es la punta del pico, no el centro de la píldora.
+ * Con el margen añadido, esa punta ya no está abajo del todo, así que el
+ * anclaje se calcula en vez de fijarse a 1.
+ */
+const MARKER_ANCHOR_Y = (MARKER_BLEED + PRICE_MARKER_HEIGHT) / MARKER_TOTAL_HEIGHT;
 
 function selectionHaptic() {
   if (Platform.OS !== 'web' && hapticsEnabled()) {
@@ -79,8 +105,9 @@ const PriceAnnotation = memo(function PriceAnnotation({
       coordinate={marker.coordinate}
       onPress={handlePress}
       tracksViewChanges={tracking}
-      // La punta de la pildora marca el sitio, no su centro.
-      anchor={{ x: 0.5, y: 1 }}
+      // La punta del pico marca el sitio, no el centro de la pildora. Con el
+      // margen de rasterizacion esa punta ya no queda abajo del todo.
+      anchor={{ x: 0.5, y: MARKER_ANCHOR_Y }}
       // El seleccionado crece: si otro marcador lo tapa, deja de leerse.
       zIndex={selected ? 2 : 1}
     >
@@ -88,8 +115,10 @@ const PriceAnnotation = memo(function PriceAnnotation({
         El toque lo atiende el <Marker>, no el Pressable de dentro: en Android
         los gestos sobre vistas anidadas en un marcador nativo se pierden a
         menudo. `pointerEvents="none"` evita que compitan por el mismo toque.
+
+        El padding es el margen que necesita la rasterizacion: ver MARKER_BLEED.
       */}
-      <View pointerEvents="none">
+      <View pointerEvents="none" style={styles.markerBleed}>
         <PriceMarker
           price={marker.price}
           selected={selected}
@@ -97,6 +126,41 @@ const PriceAnnotation = memo(function PriceAnnotation({
           onPress={handlePress}
           accessibilityLabel={marker.label}
         />
+      </View>
+    </Marker>
+  );
+});
+
+const PIN_TOTAL_HEIGHT = PLACE_PIN_HEIGHT + MARKER_BLEED * 2;
+const PIN_ANCHOR_Y = (MARKER_BLEED + PLACE_PIN_HEIGHT) / PIN_TOTAL_HEIGHT;
+
+/**
+ * Pin del sitio elegido.
+ *
+ * Necesita su propia ventana de seguimiento igual que las píldoras: sin ella,
+ * Android puede rasterizarlo antes de que termine el layout y dejarlo a medias.
+ * Se reactiva cuando cambia la coordenada, que es cuando se vuelve a montar en
+ * otro punto.
+ */
+const PinAnnotation = memo(function PinAnnotation({ coordinate }: { coordinate: LatLng }) {
+  const [tracking, setTracking] = useState(true);
+
+  useEffect(() => {
+    setTracking(true);
+    const timer = setTimeout(() => setTracking(false), TRACK_WINDOW);
+    return () => clearTimeout(timer);
+  }, [coordinate.latitude, coordinate.longitude]);
+
+  return (
+    <Marker
+      coordinate={coordinate}
+      anchor={{ x: 0.5, y: PIN_ANCHOR_Y }}
+      tracksViewChanges={tracking}
+      zIndex={3}
+      accessibilityLabel="Ubicación elegida"
+    >
+      <View pointerEvents="none" style={styles.markerBleed}>
+        <PlacePin />
       </View>
     </Marker>
   );
@@ -111,6 +175,9 @@ export function MapGoogleView({
   bottomInset = 0,
   topInset = 0,
   interactive = true,
+  onPressCoordinate,
+  pin,
+  showsUser = true,
   style,
 }: MapViewProps) {
   const mapRef = useRef<MapView>(null);
@@ -127,10 +194,15 @@ export function MapGoogleView({
     [onSelectMarker],
   );
 
-  // Tocar el mapa deselecciona, igual que en el mapa dibujado.
-  const handleMapPress = useCallback(() => {
-    if (selectedId != null) onSelectMarker(null);
-  }, [onSelectMarker, selectedId]);
+  // Tocar el mapa deselecciona, igual que en el mapa dibujado, y ademas
+  // entrega la coordenada a quien la haya pedido.
+  const handleMapPress = useCallback(
+    (event: MapPressEvent) => {
+      if (selectedId != null) onSelectMarker(null);
+      onPressCoordinate?.(event.nativeEvent.coordinate);
+    },
+    [onPressCoordinate, onSelectMarker, selectedId],
+  );
 
   return (
     <MapView
@@ -164,19 +236,23 @@ export function MapGoogleView({
       showsPointsOfInterest={false}
       showsIndoors={false}
     >
-      <Marker
-        coordinate={userLocation}
-        anchor={{ x: 0.5, y: 0.5 }}
-        // Fijo a proposito. `UserDot` late en bucle, y dejar el seguimiento
-        // encendido re-rasterizaria el marcador en cada frame para siempre. Se
-        // pierde el pulso y se gana un mapa que no se traba.
-        tracksViewChanges={false}
-        accessibilityLabel="Tu ubicación"
-      >
-        <View pointerEvents="none">
-          <UserDot />
-        </View>
-      </Marker>
+      {showsUser ? (
+        <Marker
+          coordinate={userLocation}
+          anchor={{ x: 0.5, y: 0.5 }}
+          // Fijo a proposito. `UserDot` late en bucle, y dejar el seguimiento
+          // encendido re-rasterizaria el marcador en cada frame para siempre. Se
+          // pierde el pulso y se gana un mapa que no se traba.
+          tracksViewChanges={false}
+          accessibilityLabel="Tu ubicación"
+        >
+          <View pointerEvents="none">
+            <UserDot />
+          </View>
+        </Marker>
+      ) : null}
+
+      {pin ? <PinAnnotation coordinate={pin} /> : null}
 
       {markers.map((marker) => (
         <PriceAnnotation
@@ -189,3 +265,9 @@ export function MapGoogleView({
     </MapView>
   );
 }
+
+const styles = StyleSheet.create({
+  markerBleed: {
+    padding: MARKER_BLEED,
+  },
+});
