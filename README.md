@@ -21,20 +21,15 @@ navegador.
 | Comando | Qué hace |
 |---|---|
 | `npm start` | Servidor de desarrollo (Metro) |
+| `npm run start:lan` | Fuerza la IP de la red local, por si el QR apunta a un adaptador virtual |
+| `npm run start:tunnel` | Túnel: funciona aunque el celular esté en otra red |
 | `npm run ios` / `npm run android` | Abre en simulador o dispositivo |
 | `npm run web` | Abre la versión web |
 | `npm run typecheck` | `tsc --noEmit` — debe pasar antes de cada commit |
 
-### Vista previa en tamaño teléfono
-
-El navegador de escritorio abre la app a 1536 px de ancho, que no dice nada
-sobre cómo se ve en un móvil. Para revisar a 390×760:
-
-```bash
-node .devtools/serve.js
-```
-
-y abre <http://localhost:8090> con `npm run web` corriendo en paralelo.
+El proyecto está fijado a **Expo SDK 54**, que es la versión que soporta el Expo
+Go publicado en las tiendas. Ver [`docs/01-arquitectura.md`](docs/01-arquitectura.md#versión-del-sdk-y-expo-go)
+antes de subir de SDK.
 
 ---
 

@@ -32,13 +32,10 @@ docs: documentar la ruta hacia Supabase
 npm run typecheck
 ```
 
-Debe salir sin errores. Además, revisa la pantalla que tocaste a **390 px de
-ancho**, no en el navegador maximizado:
-
-```bash
-npm run web            # en una terminal
-node .devtools/serve.js # en otra, y abre http://localhost:8090
-```
+Debe salir sin errores. Además, revisa la pantalla que tocaste **en un teléfono
+real** con Expo Go (`npm run start:lan`), no solo en el navegador maximizado: el
+escritorio abre la app a 1500 px de ancho y ahí no se ve nada de lo que importa
+—áreas táctiles, safe areas, truncamiento de texto—.
 
 ## Reglas que no se negocian
 
