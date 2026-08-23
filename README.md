@@ -12,11 +12,15 @@ reales. La arquitectura está preparada para conectar Supabase sin tocar la UI.
 
 ```bash
 npm install
+cp .env.example .env.local   # y pide las claves al equipo
 npm start
 ```
 
 Luego abre la app en Expo Go escaneando el QR, o pulsa `w` para abrirla en el
 navegador.
+
+Sin `.env.local` la app arranca igual: los datos siguen saliendo de `src/mocks`.
+Las claves solo hacen falta para el mapa nativo y para hablar con Supabase.
 
 | Comando | Qué hace |
 |---|---|
@@ -26,6 +30,7 @@ navegador.
 | `npm run ios` / `npm run android` | Abre en simulador o dispositivo |
 | `npm run web` | Abre la versión web |
 | `npm run typecheck` | `tsc --noEmit` — debe pasar antes de cada commit |
+| `npm run types:supabase` | Regenera `src/types/database.ts` desde el esquema |
 
 El proyecto está fijado a **Expo SDK 54**, que es la versión que soporta el Expo
 Go publicado en las tiendas. Ver [`docs/01-arquitectura.md`](docs/01-arquitectura.md#versión-del-sdk-y-expo-go)
@@ -53,10 +58,12 @@ src/
   constants/            theme.ts (tokens) y catalog.ts (etiquetas e iconos)
   services/             Capa asíncrona; hoy lee de /mocks, mañana de Supabase
   store/                Zustand: sesión, búsqueda, reserva, favoritos, borrador
-  types/                Modelo de dominio
+  types/                Modelo de dominio (index.ts) y filas de Postgres (database.ts)
   mocks/                Datos de ejemplo (12 parqueaderos de Bogotá)
   utils/                Formato, geometría, precios, disponibilidad
   hooks/                useAsync
+supabase/
+  migrations/           Esquema de la base. Fuente de verdad, en orden.
 ```
 
 Documentación detallada en [`docs/`](docs/):
@@ -65,6 +72,7 @@ Documentación detallada en [`docs/`](docs/):
 - [`01-arquitectura.md`](docs/01-arquitectura.md) — decisiones técnicas y ruta hacia Supabase
 - [`02-design-system.md`](docs/02-design-system.md) — identidad visual y tokens
 - [`03-mapas.md`](docs/03-mapas.md) — plan para pasar a mapas reales y qué proveedor usar
+- [`04-supabase.md`](docs/04-supabase.md) — el proyecto, el esquema y cómo conectar los servicios
 
 ---
 
@@ -84,5 +92,10 @@ Documentación detallada en [`docs/`](docs/):
   mis reservas, favoritos, perfil.
 - ✅ Propietario: inicio con ingresos, gestión de reservas, detalle de ingresos,
   publicación en 8 pasos.
-- ⏳ Pendiente: Supabase (auth, datos, storage, realtime), pagos reales, mapas
-  reales, notificaciones, verificación de llegada con fotos.
+- 🟡 Backend: el proyecto de Supabase existe y la base ya tiene esquema, RLS y
+  las funciones de reservar/cancelar. **Ninguna pantalla lo usa todavía**: los
+  servicios siguen leyendo de `src/mocks`. Ver [`docs/04-supabase.md`](docs/04-supabase.md).
+- 🟡 Mapas: claves de Google Maps creadas y conectadas, `react-native-maps`
+  instalado. Falta escribir el componente. Ver [`docs/03-mapas.md`](docs/03-mapas.md).
+- ⏳ Pendiente: autenticación (no hay pantallas de login), Storage para las fotos,
+  pagos reales, notificaciones, verificación de llegada con fotos.
