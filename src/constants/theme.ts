@@ -55,13 +55,25 @@ export const palette = {
   /** Gradient stop used to keep white controls legible over photos. */
   photoScrim: 'rgba(10,13,18,0.55)',
 
-  /** Map canvas. */
-  mapLand: '#F1F2F4',
-  mapWater: '#DCE6EF',
-  mapPark: '#E4EFE4',
+  /**
+   * Mapa. Los usan el mapa dibujado y el estilo de Google, para que la ciudad
+   * se vea igual en las dos superficies.
+   *
+   * La tierra es deliberadamente más oscura que el blanco de la app: es lo que
+   * hace que las vías blancas se lean como vías y no como fondo, y lo que
+   * separa las píldoras de precio del mapa. Un mapa casi blanco se ve limpio en
+   * una captura y plano en la mano.
+   */
+  mapLand: '#E7ECF1',
+  /** Manzanas y edificios: un escalón más oscuro, da textura sin ruido. */
+  mapLandAlt: '#DDE4EB',
+  mapWater: '#A5C6DE',
+  mapPark: '#C8DFC2',
   mapRoad: '#FFFFFF',
-  mapRoadMinor: '#F8F9FA',
-  mapLabel: '#9AA1AC',
+  mapRoadMinor: '#F4F7FA',
+  /** Vías principales en ámbar suave: jerarquía legible de un vistazo. */
+  mapHighway: '#F4DCB0',
+  mapLabel: '#6F7B89',
 } as const;
 
 export type ColorToken = keyof typeof palette;
