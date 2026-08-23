@@ -1,21 +1,42 @@
 import { Tabs } from 'expo-router';
 import { CalendarDays, Compass, Heart, User } from 'lucide-react-native';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { palette, space, type as typeScale } from '@/constants/theme';
+
+/** Alto que necesitan icono y etiqueta. Lo del sistema se suma aparte. */
+const CONTENT_HEIGHT = 56;
 
 /**
  * Four destinations, labelled, never disabled. The bar is a hairline over solid
  * white rather than a floating card — the map already provides the depth.
  */
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
+  /**
+   * La app corre en modo edge-to-edge (`edgeToEdgeEnabled` en app.json), o sea
+   * que el contenido se dibuja por debajo de la barra de navegación del
+   * sistema. Con un alto fijo, las pestañas quedaban justo debajo de los
+   * botones de Android y se tocaba el de atrás queriendo tocar "Perfil".
+   *
+   * El alto tiene que ser contenido + inset, y el padding inferior igual al
+   * inset, para que los iconos suban por encima de esa franja. El mínimo evita
+   * que la barra quede pegada al borde en teléfonos sin barra de navegación.
+   */
+  const bottomInset = Math.max(insets.bottom, space.sm);
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: palette.ink,
         tabBarInactiveTintColor: palette.inkTertiary,
-        tabBarStyle: styles.bar,
+        tabBarStyle: [
+          styles.bar,
+          { height: CONTENT_HEIGHT + bottomInset, paddingBottom: bottomInset },
+        ],
         tabBarLabelStyle: styles.label,
         tabBarItemStyle: styles.item,
         sceneStyle: { backgroundColor: palette.bg },
@@ -67,7 +88,6 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: palette.hairline,
     elevation: 0,
-    height: Platform.select({ ios: 84, default: 66 }),
     paddingTop: space.sm,
   },
   label: {
