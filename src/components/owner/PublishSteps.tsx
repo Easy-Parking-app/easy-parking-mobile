@@ -1,8 +1,9 @@
 import { Minus, Plus } from 'lucide-react-native';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { TimeField } from '@/components/booking/TimeField';
-import { MapStatic } from '@/components/map';
+import { MapView } from '@/components/map';
 import { Chip } from '@/components/ui/Chip';
 import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
@@ -12,10 +13,25 @@ import { featureCatalog, featureOrder, kindCatalog, kindOrder } from '@/constant
 import { palette, radius, space } from '@/constants/theme';
 import { useListingDraftStore } from '@/store/useListingDraftStore';
 import { formatCop, formatMinutes } from '@/utils/format';
+import { BOGOTA_CENTER } from '@/utils/geo';
 import { PhotoPickerGrid } from './PhotoPickerGrid';
 
 const ZONES = ['Chapinero', 'Chicó', 'Zona T', 'Usaquén', 'Cedritos', 'Salitre', 'Teusaquillo'];
 const PRICE_SUGGESTIONS = [3000, 4500, 6000, 8000];
+
+/**
+ * Referencias frecuentes en Bogotá, para no obligar a escribir lo obvio.
+ * La lista es un atajo, no un límite: siempre se puede añadir otra.
+ */
+const NEARBY_SUGGESTIONS = [
+  'Centro Comercial Andino',
+  'Parque de la 93',
+  'Zona T',
+  'Universidad Javeriana',
+  'Estación Calle 85',
+  'Centro Comercial Unicentro',
+  'Clínica del Country',
+];
 
 /** Step 1 — photos. */
 export function PhotosStep() {
@@ -37,17 +53,49 @@ export function PhotosStep() {
 export function LocationStep() {
   const draft = useListingDraftStore((state) => state.draft);
   const setCoordinate = useListingDraftStore((state) => state.setCoordinate);
+  const toggleLandmark = useListingDraftStore((state) => state.toggleLandmark);
+
+  const [custom, setCustom] = useState('');
+
+  // Hasta que se toque el mapa no hay punto elegido, pero el mapa tiene que
+  // abrir en algún sitio. Bogotá centro es el arranque y el pin no se pinta.
+  const point = draft.coordinate ?? BOGOTA_CENTER;
+
+  const addCustom = () => {
+    const value = custom.trim();
+    if (value.length === 0) return;
+    toggleLandmark(value);
+    setCustom('');
+  };
 
   return (
     <View style={styles.block}>
-      <MapStatic height={180} />
+      <View style={styles.picker}>
+        <MapView
+          markers={[]}
+          selectedId={null}
+          onSelectMarker={() => {}}
+          userLocation={point}
+          focus={point}
+          pin={draft.coordinate}
+          // El punto azul aquí hablaría de dónde está el propietario, que no
+          // es lo que se está eligiendo.
+          showsUser={false}
+          onPressCoordinate={(coordinate) =>
+            setCoordinate(coordinate, draft.address, draft.zone)
+          }
+        />
+      </View>
+      <Text variant="footnote" color="inkTertiary">
+        {draft.coordinate
+          ? 'Toca el mapa para mover el punto hasta la entrada.'
+          : 'Toca el mapa para marcar dónde queda la entrada.'}
+      </Text>
 
       <Input
         label="Dirección"
         value={draft.address}
-        onChangeText={(address) =>
-          setCoordinate(draft.coordinate ?? { latitude: 4.6602, longitude: -74.0555 }, address, draft.zone)
-        }
+        onChangeText={(address) => setCoordinate(point, address, draft.zone)}
         placeholder="Carrera 15 # 85-32"
         autoCapitalize="words"
       />
@@ -60,15 +108,57 @@ export function LocationStep() {
               key={zone}
               label={zone}
               selected={draft.zone === zone}
-              onPress={() =>
-                setCoordinate(
-                  draft.coordinate ?? { latitude: 4.6602, longitude: -74.0555 },
-                  draft.address,
-                  zone,
-                )
-              }
+              onPress={() => setCoordinate(point, draft.address, zone)}
             />
           ))}
+        </View>
+      </View>
+
+      <View style={styles.group}>
+        <Overline>Cerca de · opcional</Overline>
+        <Text variant="footnote" color="inkTertiary">
+          La mayoría de conductores ubica por referencia antes que por dirección.
+          Añade hasta cuatro.
+        </Text>
+
+        <View style={styles.chips}>
+          {/* Lo ya elegido va primero y se quita tocándolo. */}
+          {draft.landmarks.map((landmark) => (
+            <Chip
+              key={landmark}
+              label={landmark}
+              selected
+              onPress={() => toggleLandmark(landmark)}
+            />
+          ))}
+          {NEARBY_SUGGESTIONS.filter(
+            (suggestion) => !draft.landmarks.includes(suggestion),
+          ).map((suggestion) => (
+            <Chip
+              key={suggestion}
+              label={suggestion}
+              onPress={() => toggleLandmark(suggestion)}
+            />
+          ))}
+        </View>
+
+        <View style={styles.addRow}>
+          <Input
+            value={custom}
+            onChangeText={setCustom}
+            placeholder="Otra referencia"
+            autoCapitalize="words"
+            returnKeyType="done"
+            onSubmitEditing={addCustom}
+            containerStyle={styles.addInput}
+          />
+          <IconButton
+            icon={Plus}
+            tone="filled"
+            onPress={addCustom}
+            disabled={custom.trim().length === 0}
+            accessibilityLabel="Agregar referencia"
+          />
         </View>
       </View>
     </View>
@@ -272,6 +362,11 @@ export function ReviewStep() {
           {draft.address || 'Sin dirección'}
           {draft.zone ? ` · ${draft.zone}` : ''}
         </Text>
+        {draft.landmarks.length > 0 ? (
+          <Text variant="footnote" color="inkTertiary">
+            Cerca de {draft.landmarks.join(' · ')}
+          </Text>
+        ) : null}
 
         <View style={styles.reviewLines}>
           <ReviewLine
@@ -328,6 +423,21 @@ const styles = StyleSheet.create({
   multiline: {
     minHeight: 96,
     textAlignVertical: 'top',
+  },
+  // El mapa se posiciona con absoluteFill, así que necesita un padre con alto.
+  picker: {
+    height: 220,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    backgroundColor: palette.mapLand,
+  },
+  addRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  addInput: {
+    flex: 1,
   },
   times: {
     flexDirection: 'row',

@@ -202,6 +202,14 @@ export type ListingDraft = {
   coordinate: LatLng | null;
   address: string;
   zone: string;
+  /**
+   * Referencias cercanas: "frente al Centro Comercial Andino".
+   *
+   * Opcional. En Colombia la gente ubica por referencia antes que por
+   * nomenclatura, y para el conductor es la señal más rápida de si el
+   * parqueadero le sirve. Vacío es un estado válido.
+   */
+  landmarks: string[];
   name: string;
   kind: ParkingKind | null;
   description: string;

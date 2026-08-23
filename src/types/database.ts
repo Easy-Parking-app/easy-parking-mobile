@@ -227,6 +227,7 @@ export type Database = {
           description: string;
           id: string;
           kind: Database['public']['Enums']['parking_kind'];
+          landmarks: string[];
           latitude: number;
           location: unknown;
           longitude: number;
@@ -250,6 +251,7 @@ export type Database = {
           description?: string;
           id?: string;
           kind: Database['public']['Enums']['parking_kind'];
+          landmarks?: string[];
           latitude: number;
           location?: unknown;
           longitude: number;
@@ -273,6 +275,7 @@ export type Database = {
           description?: string;
           id?: string;
           kind?: Database['public']['Enums']['parking_kind'];
+          landmarks?: string[];
           latitude?: number;
           location?: unknown;
           longitude?: number;

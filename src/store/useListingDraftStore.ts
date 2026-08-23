@@ -32,6 +32,7 @@ const emptyDraft: ListingDraft = {
   coordinate: null,
   address: '',
   zone: '',
+  landmarks: [],
   name: '',
   kind: null,
   description: '',
@@ -56,6 +57,8 @@ type ListingDraftState = {
   addPhoto: (uri: string) => void;
   removePhoto: (uri: string) => void;
   setCoordinate: (coordinate: LatLng, address: string, zone: string) => void;
+  /** Añade o quita una referencia cercana. Opcional, no bloquea el paso. */
+  toggleLandmark: (landmark: string) => void;
   setInfo: (info: { name?: string; description?: string; kind?: ParkingKind }) => void;
   toggleFeature: (feature: FeatureKey) => void;
   setPrice: (pricePerHour: number | null, pricePerDay?: number | null) => void;
@@ -84,6 +87,26 @@ export const useListingDraftStore = create<ListingDraftState>((set, get) => ({
     })),
   setCoordinate: (coordinate, address, zone) =>
     set((state) => ({ draft: { ...state.draft, coordinate, address, zone } })),
+  toggleLandmark: (landmark) =>
+    set((state) => {
+      const value = landmark.trim();
+      if (value.length === 0) return state;
+      const already = state.draft.landmarks.some(
+        (item) => item.toLowerCase() === value.toLowerCase(),
+      );
+      return {
+        draft: {
+          ...state.draft,
+          landmarks: already
+            ? state.draft.landmarks.filter(
+                (item) => item.toLowerCase() !== value.toLowerCase(),
+              )
+            : // Un tope evita que la ficha del parqueadero se convierta en una
+              // lista de referencias y deje de leerse.
+              [...state.draft.landmarks, value].slice(0, 4),
+        },
+      };
+    }),
   setInfo: (info) => set((state) => ({ draft: { ...state.draft, ...info } })),
   toggleFeature: (feature) =>
     set((state) => ({
