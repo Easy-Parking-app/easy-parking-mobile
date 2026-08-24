@@ -112,6 +112,20 @@ type MarkProps = {
   /** Desplazamiento desde el punto hasta la esquina superior izquierda. */
   offsetX: number;
   offsetY: number;
+  /**
+   * El mismo `mapPadding` que recibe el mapa.
+   *
+   * Hace falta porque la región que llega por `onRegionChange` no es la de toda
+   * la vista sino **la de dentro del padding**: `RegionChangeEvent` la saca de
+   * `getProjection().getVisibleRegion()`, y Google Maps documenta que esa región
+   * excluye el padding.
+   *
+   * Sin descontarlo, la franja central se estira sobre la pantalla entera. El
+   * error no es constante: crece y encoge con el zoom, así que las marcas se
+   * desplazan al acercar y alejar.
+   */
+  topInset: number;
+  bottomInset: number;
   children: React.ReactNode;
   pointerEvents?: 'none' | 'box-none';
 };
@@ -122,6 +136,8 @@ const Mark = memo(function Mark({
   coordinate,
   offsetX,
   offsetY,
+  topInset,
+  bottomInset,
   children,
   pointerEvents = 'none',
 }: MarkProps) {
@@ -139,9 +155,15 @@ const Mark = memo(function Mark({
     const top = mercator(north);
     const span = top - mercator(south);
 
+    // La región cubre solo la franja que deja el padding, no la vista entera.
+    const bandTop = topInset;
+    const bandHeight = Math.max(1, height.value - topInset - bottomInset);
+
     const x = ((coordinate.longitude - west) / longitudeDelta.value) * width.value;
     const y =
-      span === 0 ? 0 : ((top - mercator(coordinate.latitude)) / span) * height.value;
+      span === 0
+        ? 0
+        : bandTop + ((top - mercator(coordinate.latitude)) / span) * bandHeight;
 
     // Fuera de pantalla no se oculta la vista, solo se apaga: montarla y
     // desmontarla en cada paneo costaría más que dejarla quieta.
@@ -278,7 +300,14 @@ export function MapGoogleView({
 
       <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
         {showsUser ? (
-          <Mark viewport={viewport} coordinate={userLocation} offsetX={-22} offsetY={-22}>
+          <Mark
+            viewport={viewport}
+            coordinate={userLocation}
+            offsetX={-22}
+            offsetY={-22}
+            topInset={topInset}
+            bottomInset={bottomInset}
+          >
             <UserDot />
           </Mark>
         ) : null}
@@ -290,6 +319,8 @@ export function MapGoogleView({
             coordinate={pin}
             offsetX={-17}
             offsetY={-PLACE_PIN_HEIGHT}
+            topInset={topInset}
+            bottomInset={bottomInset}
           >
             <PlacePin />
           </Mark>
@@ -302,6 +333,8 @@ export function MapGoogleView({
             coordinate={marker.coordinate}
             offsetX={-priceMarkerWidth(marker.price) / 2}
             offsetY={-PRICE_MARKER_HEIGHT}
+            topInset={topInset}
+            bottomInset={bottomInset}
             pointerEvents="box-none"
           >
             <PriceMarker
