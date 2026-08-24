@@ -35,6 +35,14 @@ export type PriceMarkerProps = {
   unavailable?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
+  /**
+   * Ancho fijo de la píldora.
+   *
+   * Sin él, el ancho sale de medir el texto, y dentro de un `<Marker>` de
+   * Android esa medida no es de fiar: el precio acaba recortado a "$ 8..". El
+   * mapa lo calcula y lo pasa hecho. Ver `pillWidth` en `MapGoogleView`.
+   */
+  width?: number;
 };
 
 /**
@@ -48,6 +56,7 @@ export const PriceMarker = memo(function PriceMarker({
   unavailable = false,
   onPress,
   accessibilityLabel,
+  width,
 }: PriceMarkerProps) {
   const progress = useSharedValue(selected ? 1 : 0);
 
@@ -93,6 +102,7 @@ export const PriceMarker = memo(function PriceMarker({
             backgroundColor: background,
             borderColor: selected ? palette.ink : palette.hairline,
           },
+          width != null ? { width } : null,
         ]}
       >
         <Text variant="caption" weight="700" style={{ color: foreground }} numberOfLines={1}>

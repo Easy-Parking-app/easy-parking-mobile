@@ -56,31 +56,67 @@ const TRACK_WINDOW = 450;
  * que la vista mide y sube ese bitmap al mapa. La sombra `raised` cae unos
  * 16 px y el seleccionado crece un 10 %, así que sin margen eso se recorta.
  */
-const MARKER_BLEED = 16;
+const MARKER_BLEED = 8;
 
 const MARKER_TOTAL_HEIGHT = PRICE_MARKER_HEIGHT + MARKER_BLEED * 2;
 
 /**
- * Ancho del contenedor del marcador, calculado del texto.
+ * Techo duro del marcador en Android: 100 × 100 px.
  *
- * Aquí estaba el recorte de verdad. Un margen no bastaba: dentro de un
- * `<Marker>` de Android la vista se mide con un ancho disponible que no
- * corresponde a su contenido, y la píldora acababa comprimida hasta que el
- * `numberOfLines={1}` del precio lo cortaba con puntos suspensivos —"$ 8.." en
- * vez de "$ 8.000"—. No era el bitmap: era el texto, truncado antes de pintarse.
+ * No es una estimación, sale del código de la librería. `MapMarker.java` hace:
  *
- * Fijar el ancho quita la ambigüedad. Se estima del número de caracteres y se
- * redondea hacia arriba a propósito: **pasarse es gratis** —el contenedor es
- * transparente y la píldora va centrada, así que el anclaje sigue señalando el
- * mismo punto— mientras que quedarse corto vuelve a cortar el precio.
+ *     int width  = this.width  <= 0 ? 100 : this.width;
+ *     int height = this.height <= 0 ? 100 : this.height;
+ *
+ * y rasteriza la vista en un bitmap de ese tamaño. Quien debería rellenar
+ * `this.width` es `SizeReportingShadowNode`, vía `createShadowNodeInstance` y
+ * `updateExtraData` — dos APIs de la arquitectura vieja. react-native-maps
+ * 1.20.1 no declara `codegenConfig`, o sea que no soporta la nueva
+ * arquitectura y pasa por la capa de interoperabilidad, que no llama a ninguna
+ * de las dos. El tamaño nunca se reporta, así que el fallback de 100 px se
+ * aplica siempre.
+ *
+ * Consecuencia práctica: **todo lo que pase de 100 px se recorta**, y nada en
+ * el código lo delata. Un marcador más ancho no se ve más ancho: se ve cortado.
+ *
+ * Desaparecerá el día que la librería soporte Fabric. Salirse de la nueva
+ * arquitectura no es alternativa: Expo Go SDK 54 solo trae esa.
  */
-const CHAR_WIDTH = 9;
-/** Padding horizontal de la píldora más su borde. */
-const PILL_CHROME = 28;
-const MIN_PILL_WIDTH = 62;
+const ANDROID_MARKER_CANVAS = 100;
 
-const markerWidth = (label: string) =>
-  Math.max(MIN_PILL_WIDTH, label.length * CHAR_WIDTH + PILL_CHROME) + MARKER_BLEED * 2;
+/**
+ * Ancho de la píldora, calculado del texto en vez de medido.
+ *
+ * Dentro de un `<Marker>` la medida del texto no es de fiar y el precio salía
+ * como "$ 8.." con puntos suspensivos. Calculándolo, el texto siempre cabe.
+ *
+ * Los avances son los de Roboto Bold a 12 px, la fuente y el tamaño del precio.
+ */
+const DIGIT_WIDTH = 6.7;
+const SEPARATOR_WIDTH = 3.4;
+
+const textWidth = (label: string) =>
+  [...label].reduce(
+    (total, char) =>
+      total + (char === '.' || char === ',' || char === ' ' ? SEPARATOR_WIDTH : DIGIT_WIDTH),
+    0,
+  );
+
+/** Padding horizontal de la píldora, su borde y algo de holgura. */
+const PILL_CHROME = 30;
+const MIN_PILL_WIDTH = 62;
+const MAX_PILL_WIDTH = ANDROID_MARKER_CANVAS - MARKER_BLEED * 2;
+
+/**
+ * El tope no debería activarse con tarifas por hora en pesos —"$ 12.000" se
+ * queda en 89— pero está para que un valor inesperado salga estrecho en vez de
+ * salir partido.
+ */
+const pillWidth = (label: string) =>
+  Math.min(
+    MAX_PILL_WIDTH,
+    Math.max(MIN_PILL_WIDTH, Math.ceil(textWidth(label) + PILL_CHROME)),
+  );
 
 /**
  * Anclaje del marcador, en fracción de su alto.
@@ -122,6 +158,8 @@ const PriceAnnotation = memo(function PriceAnnotation({
     onSelect(marker.id);
   }, [marker.id, onSelect]);
 
+  const width = pillWidth(formatCop(marker.price));
+
   return (
     <Marker
       coordinate={marker.coordinate}
@@ -138,13 +176,14 @@ const PriceAnnotation = memo(function PriceAnnotation({
         los gestos sobre vistas anidadas en un marcador nativo se pierden a
         menudo. `pointerEvents="none"` evita que compitan por el mismo toque.
 
-        El tamano es explicito: ver markerWidth.
+        Todo el tamano es explicito y cabe en ANDROID_MARKER_CANVAS: ni el
+        contenedor ni la pildora dependen de como Android mida el texto.
       */}
       <View
         pointerEvents="none"
         style={[
           styles.markerBox,
-          { width: markerWidth(formatCop(marker.price)), height: MARKER_TOTAL_HEIGHT },
+          { width: width + MARKER_BLEED * 2, height: MARKER_TOTAL_HEIGHT },
         ]}
       >
         <PriceMarker
@@ -153,6 +192,7 @@ const PriceAnnotation = memo(function PriceAnnotation({
           unavailable={marker.unavailable}
           onPress={handlePress}
           accessibilityLabel={marker.label}
+          width={width}
         />
       </View>
     </Marker>
