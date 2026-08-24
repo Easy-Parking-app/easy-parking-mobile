@@ -1,62 +1,107 @@
 import { memo, useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import Svg, { Path, Text as SvgText } from 'react-native-svg';
 
-import { motion, palette, radius, shadow, space } from '@/constants/theme';
+import { motion, palette, type as typeScale } from '@/constants/theme';
 import { formatCop } from '@/utils/format';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { Text } from '@/components/ui/Text';
+
+/**
+ * El marcador de precio, dibujado en SVG y no con vistas.
+ *
+ * Antes era una `View` con borde redondeado y un `<Text>` dentro. Sobre el mapa
+ * nativo salía cortado —"$ 8..", y en el peor caso solo "$"— porque dentro de un
+ * `<Marker>` de Android la vista se rasteriza a un bitmap y el ancho de la
+ * píldora dependía de medir el texto con flexbox. Esa medición no es fiable
+ * ahí: la primera pasada se hace sin el ancho correcto y nunca se rehace, así
+ * que el texto se truncaba antes de llegar a pintarse.
+ *
+ * En SVG no hay nada que medir. El lienzo lleva ancho y alto explícitos desde el
+ * primer instante, la silueta son coordenadas y el precio se centra con
+ * `textAnchor`. Lo que se dibuja ya no depende de cómo Android decida medir.
+ *
+ * El ancho se calcula con `priceMarkerWidth`, que es la misma cuenta para las
+ * dos superficies: el mapa real y el dibujado.
+ */
 
 /** Alto de la píldora. */
 const PILL_HEIGHT = 30;
-/** Lado del pico, que va girado 45°. */
-const NOTCH_SIZE = 8;
-/** Cuánto se solapa el pico con la píldora, para que no se vea la costura. */
-const NOTCH_OVERLAP = 4;
+/** Alto del pico que baja hasta el punto exacto. */
+const NOTCH_HEIGHT = 6;
+const NOTCH_WIDTH = 11;
+
+/** Alto total: de la cabeza de la píldora a la punta del pico. */
+export const PRICE_MARKER_HEIGHT = PILL_HEIGHT + NOTCH_HEIGHT;
 
 /**
- * Alto total del marcador: del borde superior de la píldora a la punta del
- * pico, que es el punto que señala la ubicación.
+ * Avances de la fuente del sistema en negrita a 12 px.
  *
- * Se exporta porque `MapGoogleView` lo necesita para calcular el anclaje del
- * `<Marker>` nativo. Dejarlo como número suelto allá significaría que cambiar
- * la píldora aquí descuadra el marcador allá sin que nada avise.
+ * Se calcula el ancho en vez de medirlo, por lo mismo que arriba. Los dígitos
+ * de las fuentes de interfaz son tabulares —todos miden igual—, así que la
+ * cuenta es exacta y no una aproximación.
  */
-export const PRICE_MARKER_HEIGHT = PILL_HEIGHT + NOTCH_SIZE - NOTCH_OVERLAP;
+const DIGIT_WIDTH = 6.7;
+const SEPARATOR_WIDTH = 3.4;
+const PADDING_X = 13;
+const MIN_WIDTH = 62;
+
+const textWidth = (label: string) =>
+  [...label].reduce(
+    (total, char) =>
+      total + (char === '.' || char === ',' || char === ' ' ? SEPARATOR_WIDTH : DIGIT_WIDTH),
+    0,
+  );
+
+/**
+ * Ancho del marcador para un precio.
+ *
+ * Lo exporta porque `MapGoogleView` necesita el número antes de renderizar,
+ * para dimensionar el contenedor del `<Marker>`.
+ */
+export const priceMarkerWidth = (price: number) =>
+  Math.max(MIN_WIDTH, Math.ceil(textWidth(formatCop(price)) + PADDING_X * 2));
+
+/** Silueta completa —píldora y pico— como un solo contorno. */
+function outline(width: number) {
+  const inset = 0.5;
+  const radius = (PILL_HEIGHT - inset * 2) / 2;
+  const left = inset + radius;
+  const right = width - inset - radius;
+  const bottom = PILL_HEIGHT - inset;
+  const center = width / 2;
+
+  return [
+    `M ${left} ${inset}`,
+    `L ${right} ${inset}`,
+    `A ${radius} ${radius} 0 0 1 ${right} ${bottom}`,
+    `L ${center + NOTCH_WIDTH / 2} ${bottom}`,
+    `L ${center} ${PRICE_MARKER_HEIGHT - inset}`,
+    `L ${center - NOTCH_WIDTH / 2} ${bottom}`,
+    `L ${left} ${bottom}`,
+    `A ${radius} ${radius} 0 0 1 ${left} ${inset}`,
+    'Z',
+  ].join(' ');
+}
 
 export type PriceMarkerProps = {
   price: number;
   selected: boolean;
-  /** Dimmed when the parking has no spots left. */
+  /** Apagado cuando el parqueadero no tiene cupos. */
   unavailable?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
-  /**
-   * Ancho fijo de la píldora.
-   *
-   * Sin él, el ancho sale de medir el texto, y dentro de un `<Marker>` de
-   * Android esa medida no es de fiar: el precio acaba recortado a "$ 8..". El
-   * mapa lo calcula y lo pasa hecho. Ver `pillWidth` en `MapGoogleView`.
-   */
-  width?: number;
 };
 
-/**
- * Easy Parking's marker: a price pill, not a pin. Price is the thing drivers
- * compare, so it is the thing the map shows. Selection inverts the pill and
- * springs it up — the same motion the sheet uses to change content.
- */
 export const PriceMarker = memo(function PriceMarker({
   price,
   selected,
   unavailable = false,
   onPress,
   accessibilityLabel,
-  width,
 }: PriceMarkerProps) {
   const progress = useSharedValue(selected ? 1 : 0);
 
@@ -72,22 +117,19 @@ export const PriceMarker = memo(function PriceMarker({
   }));
 
   /**
-   * Tres estados, tres tratamientos.
-   *
-   * "Sin cupos" se resolvía antes bajando la opacidad de todo el marcador. Sobre
-   * un mapa con color eso no se lee como apagado sino como sucio: el gris del
-   * mapa se mezcla con el blanco de la píldora. Apagarlo con color propio
-   * —relleno gris, texto terciario, sin sombra— mantiene el borde nítido y dice
-   * lo mismo con más claridad.
+   * Tres estados, tres tratamientos. "Sin cupos" se apaga con color propio y no
+   * bajando la opacidad: sobre un mapa con color eso no se lee apagado sino
+   * sucio, porque el gris del mapa se mezcla con el blanco de la píldora.
    */
   const muted = unavailable && !selected;
-  const background = selected ? palette.ink : muted ? palette.surfaceAlt : palette.bg;
-  const foreground = selected ? palette.inkInverse : muted ? palette.inkTertiary : palette.ink;
-  // El seleccionado se despega del mapa; el lleno se queda pegado a él.
-  const elevation = selected ? shadow.floating : muted ? shadow.none : shadow.raised;
+  const fill = selected ? palette.ink : muted ? palette.surfaceAlt : palette.bg;
+  const stroke = selected ? palette.ink : palette.hairline;
+  const label = selected ? palette.inkInverse : muted ? palette.inkTertiary : palette.ink;
+
+  const width = priceMarkerWidth(price);
 
   return (
-    <Animated.View style={[styles.root, animatedStyle]} pointerEvents="box-none">
+    <Animated.View style={animatedStyle} pointerEvents="box-none">
       <PressableScale
         onPress={onPress}
         haptic
@@ -95,53 +137,27 @@ export const PriceMarker = memo(function PriceMarker({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityState={{ selected }}
-        style={[
-          styles.pill,
-          elevation,
-          {
-            backgroundColor: background,
-            borderColor: selected ? palette.ink : palette.hairline,
-          },
-          width != null ? { width } : null,
-        ]}
       >
-        <Text variant="caption" weight="700" style={{ color: foreground }} numberOfLines={1}>
-          {formatCop(price)}
-        </Text>
+        <Svg
+          width={width}
+          height={PRICE_MARKER_HEIGHT}
+          viewBox={`0 0 ${width} ${PRICE_MARKER_HEIGHT}`}
+        >
+          <Path d={outline(width)} fill={fill} stroke={stroke} strokeWidth={1} />
+          <SvgText
+            x={width / 2}
+            // La línea base, no el centro: el centro óptico de una cifra queda
+            // algo por encima de la mitad geométrica de la caja.
+            y={PILL_HEIGHT / 2 + typeScale.caption.fontSize * 0.35}
+            textAnchor="middle"
+            fontSize={typeScale.caption.fontSize}
+            fontWeight="700"
+            fill={label}
+          >
+            {formatCop(price)}
+          </SvgText>
+        </Svg>
       </PressableScale>
-      <View
-        style={[
-          styles.notch,
-          {
-            backgroundColor: background,
-            borderColor: selected ? palette.ink : palette.hairline,
-          },
-        ]}
-        pointerEvents="none"
-      />
     </Animated.View>
   );
-});
-
-const styles = StyleSheet.create({
-  root: {
-    alignItems: 'center',
-  },
-  pill: {
-    height: PILL_HEIGHT,
-    minWidth: 62,
-    paddingHorizontal: space.md,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notch: {
-    width: NOTCH_SIZE,
-    height: NOTCH_SIZE,
-    marginTop: -NOTCH_OVERLAP,
-    borderRadius: 2,
-    borderWidth: StyleSheet.hairlineWidth,
-    transform: [{ rotate: '45deg' }],
-  },
 });

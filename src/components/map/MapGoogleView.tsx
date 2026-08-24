@@ -6,10 +6,9 @@ import MapView, { Marker, PROVIDER_GOOGLE, type MapPressEvent } from 'react-nati
 import { motion } from '@/constants/theme';
 import { hapticsEnabled } from '@/store/useSettingsStore';
 import type { LatLng } from '@/types';
-import { formatCop } from '@/utils/format';
 import { googleMapStyle } from './googleMapStyle';
 import { PLACE_PIN_HEIGHT, PlacePin } from './PlacePin';
-import { PRICE_MARKER_HEIGHT, PriceMarker } from './PriceMarker';
+import { PRICE_MARKER_HEIGHT, PriceMarker, priceMarkerWidth } from './PriceMarker';
 import type { MapMarker, MapViewProps } from './types';
 import { UserDot } from './UserDot';
 
@@ -85,38 +84,22 @@ const MARKER_TOTAL_HEIGHT = PRICE_MARKER_HEIGHT + MARKER_BLEED * 2;
 const ANDROID_MARKER_CANVAS = 100;
 
 /**
- * Ancho de la píldora, calculado del texto en vez de medido.
+ * Avisa en desarrollo si un marcador se pasa del lienzo.
  *
- * Dentro de un `<Marker>` la medida del texto no es de fiar y el precio salía
- * como "$ 8.." con puntos suspensivos. Calculándolo, el texto siempre cabe.
- *
- * Los avances son los de Roboto Bold a 12 px, la fuente y el tamaño del precio.
+ * El síntoma de pasarse es un marcador cortado, que es fácil confundir con un
+ * problema de estilo y difícil de rastrear hasta aquí. Cuesta tres líneas
+ * decirlo en voz alta.
  */
-const DIGIT_WIDTH = 6.7;
-const SEPARATOR_WIDTH = 3.4;
-
-const textWidth = (label: string) =>
-  [...label].reduce(
-    (total, char) =>
-      total + (char === '.' || char === ',' || char === ' ' ? SEPARATOR_WIDTH : DIGIT_WIDTH),
-    0,
-  );
-
-/** Padding horizontal de la píldora, su borde y algo de holgura. */
-const PILL_CHROME = 30;
-const MIN_PILL_WIDTH = 62;
-const MAX_PILL_WIDTH = ANDROID_MARKER_CANVAS - MARKER_BLEED * 2;
-
-/**
- * El tope no debería activarse con tarifas por hora en pesos —"$ 12.000" se
- * queda en 89— pero está para que un valor inesperado salga estrecho en vez de
- * salir partido.
- */
-const pillWidth = (label: string) =>
-  Math.min(
-    MAX_PILL_WIDTH,
-    Math.max(MIN_PILL_WIDTH, Math.ceil(textWidth(label) + PILL_CHROME)),
-  );
+function warnIfClipped(width: number, height: number, what: string) {
+  if (!__DEV__) return;
+  if (width > ANDROID_MARKER_CANVAS || height > ANDROID_MARKER_CANVAS) {
+    console.warn(
+      `[mapa] ${what} mide ${width}×${height} y el lienzo de marcadores de ` +
+        `Android es ${ANDROID_MARKER_CANVAS}×${ANDROID_MARKER_CANVAS}. ` +
+        'Se va a ver cortado.',
+    );
+  }
+}
 
 /**
  * Anclaje del marcador, en fracción de su alto.
@@ -158,7 +141,8 @@ const PriceAnnotation = memo(function PriceAnnotation({
     onSelect(marker.id);
   }, [marker.id, onSelect]);
 
-  const width = pillWidth(formatCop(marker.price));
+  const width = priceMarkerWidth(marker.price) + MARKER_BLEED * 2;
+  warnIfClipped(width, MARKER_TOTAL_HEIGHT, 'el marcador de precio');
 
   return (
     <Marker
@@ -183,7 +167,7 @@ const PriceAnnotation = memo(function PriceAnnotation({
         pointerEvents="none"
         style={[
           styles.markerBox,
-          { width: width + MARKER_BLEED * 2, height: MARKER_TOTAL_HEIGHT },
+          { width, height: MARKER_TOTAL_HEIGHT },
         ]}
       >
         <PriceMarker
@@ -192,7 +176,6 @@ const PriceAnnotation = memo(function PriceAnnotation({
           unavailable={marker.unavailable}
           onPress={handlePress}
           accessibilityLabel={marker.label}
-          width={width}
         />
       </View>
     </Marker>
