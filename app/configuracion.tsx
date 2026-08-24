@@ -24,12 +24,22 @@ import { Overline, Text } from '@/components/ui/Text';
 import { palette, radius, space } from '@/constants/theme';
 import {
   navigationAppLabels,
+  type LanguagePreference,
   useSettingsStore,
   type NavigationApp,
   type ReminderLead,
 } from '@/store/useSettingsStore';
 
 const REMINDER_OPTIONS: ReminderLead[] = [15, 30, 60];
+const LANGUAGE_OPTIONS: LanguagePreference[] = ['auto', 'es', 'en'];
+
+/** Cada idioma en su propio idioma: es lo que reconoce quien lo busca. */
+const languageLabels: Record<LanguagePreference, string> = {
+  auto: 'Automático',
+  es: 'Español',
+  en: 'English',
+};
+
 const NAVIGATION_OPTIONS: NavigationApp[] = ['google', 'waze', 'apple'];
 
 /**
@@ -48,6 +58,7 @@ export default function SettingsScreen() {
   const notifyNews = useSettingsStore((state) => state.notifyNews);
   const reminderLead = useSettingsStore((state) => state.reminderLead);
   const navigationApp = useSettingsStore((state) => state.navigationApp);
+  const language = useSettingsStore((state) => state.language);
   const useLocation = useSettingsStore((state) => state.useLocation);
 
   const setHaptics = useSettingsStore((state) => state.setHaptics);
@@ -56,6 +67,7 @@ export default function SettingsScreen() {
   const setNotifyNews = useSettingsStore((state) => state.setNotifyNews);
   const setReminderLead = useSettingsStore((state) => state.setReminderLead);
   const setNavigationApp = useSettingsStore((state) => state.setNavigationApp);
+  const setLanguage = useSettingsStore((state) => state.setLanguage);
   const setUseLocation = useSettingsStore((state) => state.setUseLocation);
   const reset = useSettingsStore((state) => state.reset);
 
@@ -168,7 +180,29 @@ export default function SettingsScreen() {
             onValueChange={setUseLocation}
           />
           <Divider inset={space.giant} />
-          <Row icon={Globe} label="Idioma" value="Español" chevron={false} />
+          <View style={styles.block}>
+            <View style={styles.blockHeader}>
+              <View style={styles.glyph}>
+                <Globe size={18} color={palette.inkSecondary} strokeWidth={2} />
+              </View>
+              <View style={styles.blockBody}>
+                <Text variant="callout">Idioma</Text>
+                <Text variant="footnote" color="inkTertiary">
+                  Automático sigue al idioma del teléfono
+                </Text>
+              </View>
+            </View>
+            <View style={styles.chips}>
+              {LANGUAGE_OPTIONS.map((option) => (
+                <Chip
+                  key={option}
+                  label={languageLabels[option]}
+                  selected={language === option}
+                  onPress={() => setLanguage(option)}
+                />
+              ))}
+            </View>
+          </View>
           <Divider inset={space.giant} />
           <Row icon={CircleDollarSign} label="Moneda" value="COP" chevron={false} />
         </Group>

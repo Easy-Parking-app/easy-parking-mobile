@@ -1,10 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { deviceLocale, setLocale, type Locale } from '@/i18n';
 import { storage, storeKey } from './persist';
 
 /** App de navegación a la que se envía al conductor desde una reserva. */
 export type NavigationApp = 'google' | 'waze' | 'apple';
+
+/** Idioma de la interfaz. `auto` sigue al del teléfono. */
+export type LanguagePreference = 'auto' | Locale;
 
 /** Antelación del recordatorio, en minutos. */
 export type ReminderLead = 15 | 30 | 60;
@@ -22,6 +26,7 @@ type SettingsState = {
   navigationApp: NavigationApp;
   /** Permite que la app use la ubicación para ordenar por cercanía. */
   useLocation: boolean;
+  language: LanguagePreference;
 
   setHaptics: (value: boolean) => void;
   setNotifyBookings: (value: boolean) => void;
@@ -30,6 +35,7 @@ type SettingsState = {
   setReminderLead: (value: ReminderLead) => void;
   setNavigationApp: (value: NavigationApp) => void;
   setUseLocation: (value: boolean) => void;
+  setLanguage: (value: LanguagePreference) => void;
   reset: () => void;
 };
 
@@ -41,6 +47,7 @@ const defaults = {
   reminderLead: 30 as ReminderLead,
   navigationApp: 'google' as NavigationApp,
   useLocation: true,
+  language: 'auto' as LanguagePreference,
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -54,9 +61,26 @@ export const useSettingsStore = create<SettingsState>()(
       setReminderLead: (reminderLead) => set({ reminderLead }),
       setNavigationApp: (navigationApp) => set({ navigationApp }),
       setUseLocation: (useLocation) => set({ useLocation }),
+      setLanguage: (language) => {
+        setLocale(language === 'auto' ? deviceLocale() : language);
+        set({ language });
+      },
       reset: () => set(defaults),
     }),
-    { name: storeKey('settings'), storage },
+    {
+      name: storeKey('settings'),
+      storage,
+      /**
+       * El idioma guardado se aplica al recuperar la sesión.
+       *
+       * `i18n` arranca con el del teléfono, que es lo correcto la primera vez;
+       * si el usuario eligió otro, la preferencia llega aquí unos milisegundos
+       * después y hay que volver a aplicarla.
+       */
+      onRehydrateStorage: () => (state) => {
+        if (state && state.language !== 'auto') setLocale(state.language);
+      },
+    },
   ),
 );
 

@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { palette, space, type as typeScale } from '@/constants/theme';
+import { useT } from '@/i18n/useT';
 
 /** Alto que necesitan icono y etiqueta. Lo del sistema se suma aparte. */
 const CONTENT_HEIGHT = 56;
@@ -14,6 +15,7 @@ const CONTENT_HEIGHT = 56;
  */
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   /**
    * La app corre en modo edge-to-edge (`edgeToEdgeEnabled` en app.json), o sea
@@ -45,7 +47,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Explorar',
+          title: t('tabs.explorar'),
           tabBarIcon: ({ color, focused }) => (
             <Compass size={23} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
@@ -54,7 +56,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="reservas"
         options={{
-          title: 'Reservas',
+          title: t('tabs.reservas'),
           tabBarIcon: ({ color, focused }) => (
             <CalendarDays size={23} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
@@ -63,7 +65,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="favoritos"
         options={{
-          title: 'Favoritos',
+          title: t('tabs.favoritos'),
           tabBarIcon: ({ color, focused }) => (
             <Heart size={23} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
@@ -72,7 +74,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="perfil"
         options={{
-          title: 'Perfil',
+          title: t('tabs.perfil'),
           tabBarIcon: ({ color, focused }) => (
             <User size={23} color={color} strokeWidth={focused ? 2.4 : 1.9} />
           ),
