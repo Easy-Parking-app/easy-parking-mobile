@@ -53,23 +53,35 @@ function Capture({
 
   useEffect(() => {
     let alive = true;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const capture = async () => {
+      try {
+        /**
+         * A archivo, no a data-uri.
+         *
+         * El `image` del marcador acepta las dos cosas, pero un data-uri lleva
+         * el PNG entero en base64 cruzando el puente y luego Fresco tiene que
+         * decodificarlo. Mientras tanto el marcador no tiene icono, y
+         * `getIcon()` devuelve el pin rojo por defecto: se ve un pin rojo que
+         * al rato se convierte en píldora. Desde archivo la carga es
+         * prácticamente inmediata y ese salto no llega a verse.
+         */
+        const path = await captureRef(ref, { format: 'png', quality: 1 });
+        if (!alive) return;
+        onCaptured(id, path.startsWith('file://') ? path : `file://${path}`);
+      } catch {
+        // Un reintento: el primer fallo suele ser layout que aún no ocurrió.
+        // Si el segundo también falla, la variante se queda sin imagen y su
+        // marcador no se dibuja, que es mejor que dibujarlo roto.
+        if (alive && attempt++ < 1) timer = setTimeout(capture, 120);
+      }
+    };
 
     // Un turno de espera para que el layout haya ocurrido: capturar antes
     // devuelve una imagen vacía.
-    const timer = setTimeout(async () => {
-      try {
-        const uri = await captureRef(ref, {
-          format: 'png',
-          quality: 1,
-          result: 'data-uri',
-        });
-        if (alive) onCaptured(id, uri);
-      } catch {
-        // Si falla, la variante se queda sin imagen y su marcador no se dibuja.
-        // Es preferible a dibujar un marcador roto, y se reintenta solo la
-        // próxima vez que la lista de variantes cambie.
-      }
-    }, 0);
+    timer = setTimeout(capture, 0);
 
     return () => {
       alive = false;

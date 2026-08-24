@@ -34,8 +34,7 @@ import { UserDot } from './UserDot';
  */
 const INITIAL_ZOOM = 14;
 
-const priceKey = (price: number, selected: boolean, unavailable: boolean) =>
-  `p${price}${selected ? 's' : ''}${unavailable ? 'x' : ''}`;
+const priceKey = (price: number, selected: boolean) => `p${price}${selected ? 's' : ''}`;
 
 export function MapGoogleView({
   markers,
@@ -66,7 +65,7 @@ export function MapGoogleView({
 
     for (const marker of markers) {
       for (const selected of [false, true]) {
-        const key = priceKey(marker.price, selected, marker.unavailable ?? false);
+        const key = priceKey(marker.price, selected);
         if (seen.has(key)) continue;
         seen.add(key);
         list.push({
@@ -75,7 +74,6 @@ export function MapGoogleView({
             <PriceMarker
               price={marker.price}
               selected={selected}
-              unavailable={marker.unavailable}
               onPress={() => {}}
               accessibilityLabel={marker.label}
             />
@@ -166,7 +164,7 @@ export function MapGoogleView({
 
         {markers.map((marker) => {
           const selected = marker.id === selectedId;
-          const uri = images[priceKey(marker.price, selected, marker.unavailable ?? false)];
+          const uri = images[priceKey(marker.price, selected)];
           // Sin imagen todavía no se dibuja nada: mejor que un marcador a medias.
           if (!uri) return null;
 

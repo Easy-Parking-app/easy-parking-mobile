@@ -90,8 +90,6 @@ function outline(width: number) {
 export type PriceMarkerProps = {
   price: number;
   selected: boolean;
-  /** Apagado cuando el parqueadero no tiene cupos. */
-  unavailable?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
 };
@@ -99,7 +97,6 @@ export type PriceMarkerProps = {
 export const PriceMarker = memo(function PriceMarker({
   price,
   selected,
-  unavailable = false,
   onPress,
   accessibilityLabel,
 }: PriceMarkerProps) {
@@ -116,15 +113,14 @@ export const PriceMarker = memo(function PriceMarker({
     ],
   }));
 
-  /**
-   * Tres estados, tres tratamientos. "Sin cupos" se apaga con color propio y no
-   * bajando la opacidad: sobre un mapa con color eso no se lee apagado sino
-   * sucio, porque el gris del mapa se mezcla con el blanco de la píldora.
-   */
-  const muted = unavailable && !selected;
-  const fill = selected ? palette.ink : muted ? palette.surfaceAlt : palette.bg;
+  // Dos estados y no tres. Antes las que no tenian cupos salian en gris, pero
+  // en el mapa eso se lee como "esta apagada" y no como "esta llena", y rompe
+  // la lectura de un vistazo: la fila de precios deja de compararse sola. La
+  // disponibilidad la dice la lista, con su etiqueta, donde si hay sitio para
+  // explicarla.
+  const fill = selected ? palette.ink : palette.bg;
   const stroke = selected ? palette.ink : palette.hairline;
-  const label = selected ? palette.inkInverse : muted ? palette.inkTertiary : palette.ink;
+  const label = selected ? palette.inkInverse : palette.ink;
 
   const width = priceMarkerWidth(price);
 

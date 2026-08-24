@@ -7,7 +7,6 @@ export type MapMarker = {
   coordinate: LatLng;
   /** COP per hour, rendered inside the pill. */
   price: number;
-  unavailable?: boolean;
   label: string;
 };
 

@@ -68,7 +68,6 @@ export default function ExploreScreen() {
         id: parking.id,
         coordinate: parking.coordinate,
         price: parking.pricePerHour,
-        unavailable: parking.spotsAvailable === 0,
         label: `${parking.name}, ${parking.pricePerHour} pesos por hora`,
       })),
     [parkings],
