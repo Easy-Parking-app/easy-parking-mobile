@@ -1,8 +1,7 @@
-# Propuesta para inversores — borrador
+# Propuesta para inversores
 
-Borrador para la propuesta de Angel Investment Network. **Nada de esto está
-publicado**: la propuesta está guardada como borrador y no se ha contratado
-ningún paquete.
+**Estado:** guardada como borrador en Angel Investment Network, propuesta
+`1641734`. **No está publicada** y no se ha contratado ningún paquete.
 
 > **Regla que gobierna este documento:** aquí no va un solo dato inventado. Lo
 > que no sabemos aparece marcado como `[PENDIENTE]` con la fuente de donde debe
@@ -22,9 +21,26 @@ ningún paquete.
 | Sector 2 | Software | Amplía el alcance a inversores de tecnología |
 | Fase | **Pre-lanzamiento/R&D** | Es la respuesta veraz: no hay backend conectado ni usuarios |
 | Teléfono | El de tu cuenta | Ya venía rellenado |
+| Tipo de inversor | Monthly | Con producto sin lanzar, un ángel implicado vale más que uno silencioso |
+| A recaudar | **USD 50.000** | Decisión tuya. La cuenta de abajo cierra en 30.000 |
+| Ya recaudado | 0 | |
+| Mínimo por inversor | **USD 5.000** | Hasta diez ángeles, sin volver la tabla de socios un caos |
+| Participación ofrecida | **15%** | Pre-money de USD 283.000 |
+| Logo | `assets/icon.png` | Cargado |
 
-Sin rellenar, a la espera de tus decisiones: cuánto levantar, cuánto llevas
-recaudado, inversión mínima por inversor, y el tipo de inversor que buscas.
+Escritas también: resumen, negocio, mercado, progreso, objetivos, cinco puntos
+clave, el acuerdo y el equipo.
+
+### Lo que queda pendiente en la web
+
+- **Imágenes.** Es lo que más falta. Manda tres o cuatro capturas de la app en
+  el teléfono —el mapa con las píldoras, el detalle de un parqueadero, el
+  checkout— y las subo. Una propuesta con capturas de un producto que existe
+  pesa mucho más que una sin ellas.
+- **Mercado y competencia**, marcados como pendientes dentro del propio
+  formulario para que no se publiquen vacíos por accidente.
+- **Tu formación y experiencia**, en la sección de Equipo.
+- **Paquetes** y **Publicar**: no los toco. El pago lo decides y lo haces tú.
 
 ---
 
@@ -126,21 +142,28 @@ el estado real:
 
 ## Equipo
 
-`[PENDIENTE]` — Quién eres, qué has construido antes, y quién más está. Si
-todavía es una sola persona, decirlo: se nota igual, y disimularlo cuesta más
-que reconocerlo.
+Fundador único. Toda la aplicación —los dos flujos, la interfaz, el mapa y la
+base de datos— está construida por una sola persona.
+
+Eso se cuenta como lo que es, sin disimularlo. Un fundador solo es más difícil
+de financiar, pero la contrapartida es real y verificable: **el riesgo de
+ejecución técnica es bajo**, porque lo que se promete no está en una
+presentación, está construido y se puede probar.
+
+Falta añadir tu formación y tu experiencia previa. Eso solo lo puedes escribir tú.
 
 ---
 
-## Lo que hay que decidir antes de publicar
+## Constituir la SAS: el paso que no se puede saltar
 
-1. **¿Existe empresa constituida?** ¿SAS? Razón social exacta.
-2. **¿Cuánto quieres levantar** y a cambio de qué porcentaje?
-3. **¿Inversión mínima por inversor?** Marca el tipo de ángel que te escribe.
-4. **¿Equipo?** ¿Solo tú, o también el colaborador que va a entrar al repo?
-5. **¿Tipo de inversor?** El formulario ofrece: cualquiera, diario, semanal,
-   mensual, silencioso. Con un producto sin lanzar, un ángel que se involucre
-   suele valer más que uno silencioso.
+Nadie puede invertir en una persona natural. Antes de que la propuesta pueda
+terminar en dinero, tiene que existir la sociedad.
+
+En Colombia la **SAS unipersonal** es legal: puedes ser accionista único y
+representante legal a la vez. El registro arranca desde ~$500.000 COP, y el
+impuesto de registro es un 0,6–0,7% del capital declarado, así que declarar un
+capital bajo lo mantiene barato. Se hace en la Cámara de Comercio y luego el RUT
+en la DIAN.
 
 ## Y una recomendación sobre el momento
 
