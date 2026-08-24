@@ -88,20 +88,30 @@ function mercator(latitude: number) {
 }
 
 /**
- * La región visible, en valores compartidos.
+ * La región visible, en un único valor compartido.
  *
- * Compartidos y no estado de React: es la diferencia entre que las marcas sigan
+ * Compartido y no estado de React: es la diferencia entre que las marcas sigan
  * al dedo y que vayan un paso por detrás. `onRegionChange` se dispara en cada
- * frame del gesto; si cada uno provocara un render, React tendría que reconciliar
- * doce vistas por frame y la capa se quedaría atrás del mapa —que se mueve en el
- * hilo nativo—. Escribiendo en valores compartidos, el gesto no toca React: cada
- * marca recalcula su posición en el hilo de UI.
+ * frame del gesto; si cada uno provocara un render, React tendría que
+ * reconciliar doce vistas por frame y la capa se quedaría atrás del mapa —que
+ * se mueve en el hilo nativo—.
+ *
+ * **Uno y no cuatro, y eso importa.** Escribir centro y deltas en cuatro
+ * valores distintos son cuatro sincronizaciones independientes hacia el hilo de
+ * UI, y no hay garantía de que lleguen en el mismo frame. Cuando no llegan, la
+ * proyección mezcla el centro nuevo con el zoom viejo, y el resultado es que
+ * las marcas tiemblan mientras el mapa se mueve. Un solo objeto se actualiza de
+ * forma atómica: o está entero o no está.
  */
+type Region4 = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
+
 type Viewport = {
-  latitude: SharedValue<number>;
-  longitude: SharedValue<number>;
-  latitudeDelta: SharedValue<number>;
-  longitudeDelta: SharedValue<number>;
+  region: SharedValue<Region4>;
   width: SharedValue<number>;
   height: SharedValue<number>;
 };
@@ -142,24 +152,28 @@ const Mark = memo(function Mark({
   pointerEvents = 'none',
 }: MarkProps) {
   const style = useAnimatedStyle(() => {
-    const { longitudeDelta, latitudeDelta, width, height } = viewport;
+    // Una sola lectura: el resto del cálculo trabaja sobre esta instantánea, de
+    // modo que centro y zoom siempre corresponden al mismo frame.
+    const region = viewport.region.value;
+    const viewWidth = viewport.width.value;
+    const viewHeight = viewport.height.value;
 
-    if (longitudeDelta.value === 0 || width.value === 0) {
+    if (region.longitudeDelta === 0 || viewWidth === 0) {
       return { opacity: 0, transform: [{ translateX: 0 }, { translateY: 0 }] };
     }
 
-    const west = viewport.longitude.value - longitudeDelta.value / 2;
-    const north = viewport.latitude.value + latitudeDelta.value / 2;
-    const south = viewport.latitude.value - latitudeDelta.value / 2;
+    const west = region.longitude - region.longitudeDelta / 2;
+    const north = region.latitude + region.latitudeDelta / 2;
+    const south = region.latitude - region.latitudeDelta / 2;
 
     const top = mercator(north);
     const span = top - mercator(south);
 
     // La región cubre solo la franja que deja el padding, no la vista entera.
     const bandTop = topInset;
-    const bandHeight = Math.max(1, height.value - topInset - bottomInset);
+    const bandHeight = Math.max(1, viewHeight - topInset - bottomInset);
 
-    const x = ((coordinate.longitude - west) / longitudeDelta.value) * width.value;
+    const x = ((coordinate.longitude - west) / region.longitudeDelta) * viewWidth;
     const y =
       span === 0
         ? 0
@@ -169,9 +183,9 @@ const Mark = memo(function Mark({
     // desmontarla en cada paneo costaría más que dejarla quieta.
     const visible =
       x > -CULL_MARGIN &&
-      x < width.value + CULL_MARGIN &&
+      x < viewWidth + CULL_MARGIN &&
       y > -CULL_MARGIN &&
-      y < height.value + CULL_MARGIN;
+      y < viewHeight + CULL_MARGIN;
 
     return {
       opacity: visible ? 1 : 0,
@@ -204,10 +218,14 @@ export function MapGoogleView({
 }: MapViewProps) {
   const mapRef = useRef<MapView>(null);
 
-  const latitude = useSharedValue(userLocation.latitude);
-  const longitude = useSharedValue(userLocation.longitude);
-  const latitudeDelta = useSharedValue(0);
-  const longitudeDelta = useSharedValue(0);
+  const region = useSharedValue<Region4>({
+    latitude: userLocation.latitude,
+    longitude: userLocation.longitude,
+    // Cero significa "todavía no sabemos": las marcas se quedan apagadas hasta
+    // que llegue la primera región de verdad.
+    latitudeDelta: 0,
+    longitudeDelta: 0,
+  });
   const width = useSharedValue(0);
   const height = useSharedValue(0);
 
@@ -219,8 +237,8 @@ export function MapGoogleView({
    * referencia nueva cada vez, así que el `memo` no serviría de nada.
    */
   const viewport: Viewport = useMemo(
-    () => ({ latitude, longitude, latitudeDelta, longitudeDelta, width, height }),
-    [height, latitude, latitudeDelta, longitude, longitudeDelta, width],
+    () => ({ region, width, height }),
+    [height, region, width],
   );
 
   const onLayout = useCallback(
@@ -232,13 +250,17 @@ export function MapGoogleView({
   );
 
   const onRegionChange = useCallback(
-    (region: Region) => {
-      latitude.value = region.latitude;
-      longitude.value = region.longitude;
-      latitudeDelta.value = region.latitudeDelta;
-      longitudeDelta.value = region.longitudeDelta;
+    (next: Region) => {
+      // Una sola escritura. Ver la nota en `Viewport`: repartirla en cuatro
+      // hace que el hilo de UI pueda ver una región a medio actualizar.
+      region.value = {
+        latitude: next.latitude,
+        longitude: next.longitude,
+        latitudeDelta: next.latitudeDelta,
+        longitudeDelta: next.longitudeDelta,
+      };
     },
-    [latitude, latitudeDelta, longitude, longitudeDelta],
+    [region],
   );
 
   // Mueve la cámara cuando cambia el foco: al elegir un parqueadero o al buscar
