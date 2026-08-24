@@ -610,9 +610,231 @@ def financial_model():
     return path
 
 
+# ------------------------------------------------------------ plan de negocio
+
+class Flow:
+    """Texto que fluye y salta de pagina solo."""
+
+    def __init__(self, c, w, h, margin=56):
+        self.c, self.w, self.h, self.m = c, w, h, margin
+        self.inner = w - margin * 2
+        self.y = h - 96
+        self.page = 1
+
+    def _footer(self):
+        c = self.c
+        c.setStrokeColor(HAIRLINE)
+        c.setLineWidth(1)
+        c.line(self.m, 62, self.w - self.m, 62)
+        c.setFont(REG, 8.5)
+        c.setFillColor(INK_3)
+        c.drawString(self.m, 46, 'Easy Parking  ·  Plan de negocio')
+        c.drawRightString(self.w - self.m, 46, str(self.page))
+
+    def need(self, space):
+        if self.y - space < 84:
+            self._footer()
+            self.c.showPage()
+            self.page += 1
+            self.y = self.h - 72
+
+    def heading(self, text):
+        self.need(70)
+        self.c.setFont(BOLD, 13)
+        self.c.setFillColor(INK)
+        self.c.drawString(self.m, self.y, text)
+        self.y -= 9
+        self.c.setStrokeColor(ACCENT)
+        self.c.setLineWidth(2)
+        self.c.line(self.m, self.y, self.m + 26, self.y)
+        self.y -= 22
+
+    def body(self, text, size=10, leading=15, color=INK_2, font=REG):
+        for line in wrap(text, font, size, self.inner):
+            self.need(leading)
+            self.c.setFont(font, size)
+            self.c.setFillColor(color)
+            self.c.drawString(self.m, self.y, line)
+            self.y -= leading
+        self.y -= 7
+
+    def item(self, head, text):
+        self.need(50)
+        self.c.setFont(BOLD, 10)
+        self.c.setFillColor(INK)
+        self.c.drawString(self.m, self.y, head)
+        self.y -= 15
+        self.body(text)
+
+    def close(self):
+        self._footer()
+
+
+def business_plan():
+    path = os.path.join(OUT, 'easy-parking-plan-de-negocio.pdf')
+    w, h = A4
+    c = canvas.Canvas(path, pagesize=A4)
+    c.setTitle('Easy Parking - Plan de negocio')
+    c.setAuthor('Easy Parking')
+
+    c.setFillColor(INK)
+    c.rect(0, h - 116, w, 116, fill=1, stroke=0)
+    if os.path.exists(LOGO):
+        c.drawImage(ImageReader(LOGO), 56, h - 92, width=42, height=42, mask='auto')
+    c.setFont(BOLD, 22)
+    c.setFillColor(WHITE)
+    c.drawString(112, h - 68, 'Plan de negocio')
+    c.setFont(REG, 11)
+    c.setFillColor(HexColor('#8C94A1'))
+    c.drawString(112, h - 87, 'Easy Parking  ·  Bogota, Colombia')
+
+    f = Flow(c, w, h)
+    f.y = h - 152
+
+    f.heading('1. Que es Easy Parking')
+    f.body('Un marketplace de parqueaderos para Bogota, en aplicacion movil para iOS y '
+           'Android. Conecta a quien necesita donde dejar el carro con quien tiene un '
+           'espacio parado: garajes, lotes y parqueaderos pequenos que hoy no tienen '
+           'ninguna forma de vender sus horas ociosas.')
+    f.body('El conductor ve en el mapa que hay cerca, a que precio y con cuantos cupos, y '
+           'reserva antes de salir. El propietario publica su espacio en ocho pasos y cobra '
+           'por horas que hoy no le producen nada. Nosotros cobramos comision por reserva.')
+
+    f.heading('2. El problema')
+    f.item('Del lado del conductor',
+           'No sabe si hay cupo hasta que llega. Da vueltas a la manzana, compara precios de '
+           'memoria y termina en el primero que encuentra. En las zonas de mayor actividad '
+           '-Chapinero, Chico, Zona T, Usaquen- buscar parqueadero es parte del trayecto.')
+    f.item('Del lado del propietario',
+           'Un garaje privado, un lote o un parqueadero de pocas plazas tiene capacidad '
+           'ociosa casi todo el dia. Su unica herramienta comercial es un letrero en la reja, '
+           'y cobrarle a un desconocido implica un riesgo que la mayoria prefiere no correr.')
+
+    f.heading('3. La solucion y el producto')
+    f.item('Precio visible sobre el mapa',
+           'No un pin generico: la tarifa por hora se lee directamente encima de cada '
+           'parqueadero, para poder comparar sin abrir nada. Es la decision de producto que '
+           'mas diferencia la pantalla principal.')
+    f.item('Reserva con tarifa congelada',
+           'El precio se fija al reservar. Si el propietario sube la tarifa manana, el recibo '
+           'de ayer no cambia.')
+    f.item('Publicacion guiada en ocho pasos',
+           'Una decision por pantalla. Publicar no puede sentirse como un tramite, porque el '
+           'propietario es la parte dificil de conseguir.')
+    f.item('Pagos locales desde el diseno',
+           'Nequi, Daviplata, PSE y tarjeta, contemplados en el modelo desde el principio.')
+
+    f.heading('4. Estado del producto')
+    f.body('Construido y funcionando como prototipo: aplicacion con los dos flujos completos, '
+           '20 pantallas, mapa real con estilo propio, y una base de datos disenada e '
+           'implementada con seguridad por fila, reserva atomica -dos personas no pueden '
+           'llevarse el mismo cupo- y busqueda por cercania con indice espacial.')
+    f.body('Falta, dicho sin adornos: autenticacion, conectar la aplicacion a esa base de '
+           'datos, e integrar la pasarela de pagos. Hoy no hay usuarios ni ingresos. La '
+           'inversion es precisamente para cerrar ese tramo.')
+
+    f.heading('5. Modelo de negocio')
+    f.body('Comision del 10% sobre cada reserva, con piso de 900 COP, ya implementada en la '
+           'logica de precios: tramos de 30 minutos con minimo de una hora, y tope por tarifa '
+           'diaria cuando el propietario la ofrece. La tarifa la pone el propietario.')
+    f.body('No compramos ni operamos parqueaderos. No hay costo por plaza ni inversion de '
+           'capital por ciudad, asi que el margen no se consume en operacion. Los supuestos y '
+           'el escenario a doce meses estan en el modelo financiero que acompana a este plan.')
+
+    f.heading('6. Mercado')
+    f.body('Bogota concentra el mayor parque automotor del pais y una escasez de parqueadero '
+           'conocida por cualquiera que maneje en la ciudad. La oferta esta fragmentada: '
+           'junto a los parqueaderos comerciales hay miles de espacios privados sin ninguna '
+           'manera de comercializarse. Esa capacidad ociosa es el inventario del negocio.')
+    f.body('PENDIENTE ANTES DE PUBLICAR: cifras de parque automotor y de parqueaderos '
+           'registrados, del RUNT y de la Secretaria Distrital de Movilidad, y tarifa promedio '
+           'levantada en campo. El tamano de mercado se construira de abajo hacia arriba '
+           '-cupos por ocupacion por tarifa- y no copiando un informe global.', color=AMBER)
+
+    f.heading('7. Competencia')
+    f.body('El espacio no esta vacio, y conviene decirlo antes de que lo diga el inversor. En '
+           'Bogota ya operan, entre otros:')
+    f.item('RentaParking (desde 2016)',
+           'El mas parecido: publicar, descubrir y reservar espacios, con alquiler por horas, '
+           'noches, semanas o mensualidades.')
+    f.item('NIDOO',
+           'Plataforma para encontrar, reservar y pagar estacionamiento publico o privado.')
+    f.item('Parkcero',
+           'Reserva por minutos, horas, dias o semanas, con enfasis en precio.')
+    f.item('Zona de Parqueo Pago (Distrito)',
+           'La aplicacion oficial de parqueo en via, con mas de 5.000 cupos. No compite en '
+           'fuera de via, pero si por el mismo momento de decision del conductor.')
+    f.item('MotoPass',
+           'Especializado en motos, con planes y suscripciones.')
+    f.body('Que significa esto. Que la tesis ya esta validada por otros: hay demanda y hay '
+           'oferta dispuesta a digitalizarse. Y tambien que no vamos a ganar por ser los '
+           'primeros, porque no lo somos.')
+    f.body('Donde puede estar la diferencia, dicho con prudencia: en comparar precio sin '
+           'friccion sobre el mapa, en hacer que publicar sea lo bastante facil como para '
+           'atraer al garaje particular -la punta larga de la oferta, no los parqueaderos '
+           'comerciales que ya estan en las otras plataformas- y en la ejecucion comercial. '
+           'En un marketplace con competidores establecidos la ventaja no es una '
+           'funcionalidad: es la densidad de oferta en las manzanas donde el conductor busca.')
+
+    f.heading('8. Estrategia de entrada')
+    f.item('Concentracion geografica antes que cobertura',
+           'Empezar por dos o tres barrios -Chapinero y Chico- hasta tener densidad suficiente '
+           'para que abrir la app siempre devuelva algo util. Cien parqueaderos repartidos por '
+           'toda la ciudad no sirven; veinte en cuatro manzanas si.')
+    f.item('La oferta primero',
+           'Sin parqueaderos publicados no hay nada que ensenarle a un conductor. El primer '
+           'trabajo es de calle: tocar puertas de garajes y edificios.')
+    f.item('Comision reducida para los primeros',
+           'Un incentivo de entrada para los propietarios fundadores. Cuesta margen, no caja, '
+           'y compra la densidad inicial.')
+
+    f.heading('9. Riesgos')
+    f.item('Arranque en frio del marketplace',
+           'Sin oferta no hay demanda y sin demanda no hay oferta. Se mitiga con concentracion '
+           'geografica e incentivos a los primeros propietarios, no con publicidad.')
+    f.item('Competidores con ventaja de tiempo',
+           'RentaParking lleva anos. Si ya resolvieron la densidad de oferta en las zonas '
+           'buenas, entrar cuesta mas. Hay que medirlo en campo antes de gastar.')
+    f.item('Fundador unico',
+           'Es el riesgo que mas senala cualquier inversor, y es real. La contrapartida es que '
+           'el producto ya esta construido: el riesgo de ejecucion tecnica es bajo.')
+    f.item('Confianza y responsabilidad',
+           'Que pasa si danan un carro dentro de un garaje particular. Se resuelve con '
+           'terminos claros y, llegado el volumen, con un seguro. No esta resuelto todavia.')
+
+    f.heading('10. Equipo')
+    f.body('Fundador unico. Toda la aplicacion -los dos flujos, la interfaz, la integracion '
+           'del mapa y la base de datos con sus reglas de seguridad y su logica de reservas- '
+           'esta construida por una sola persona. Lo que sigue no es mas codigo, es trabajo '
+           'de calle, y por eso el primer destino de la inversion es la dedicacion de tiempo '
+           'completo.')
+
+    f.heading('11. La ronda')
+    f.body('USD 50.000 por el 15% de participacion, equivalente a una valoracion pre-money de '
+           'USD 283.000. Inversion minima por inversor: USD 5.000. Abiertos a estructurarlo '
+           'como nota convertible: con el producto sin lanzar, aplazar la discusion de '
+           'valoracion suele convenirle a las dos partes.')
+    f.item('Destino de los fondos',
+           'Dedicacion de tiempo completo del fundador; terminar el producto -autenticacion, '
+           'backend y pasarela de pagos-; conseguir la oferta inicial en Bogota; e '
+           'infraestructura, constitucion de la sociedad y contabilidad.')
+
+    f.heading('12. Constitucion')
+    f.body('La sociedad todavia no existe. En Colombia la SAS unipersonal permite un unico '
+           'accionista que a la vez es representante legal, con registro en la Camara de '
+           'Comercio y RUT ante la DIAN. El impuesto de registro es un porcentaje del capital '
+           'declarado, de modo que un capital inicial bajo mantiene el tramite economico. Es '
+           'condicion previa a recibir cualquier inversion.')
+
+    f.close()
+    c.showPage()
+    c.save()
+    return path
+
+
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    for build in (deck, executive_summary, financial_model):
+    for build in (deck, executive_summary, financial_model, business_plan):
         created = build()
         size = os.path.getsize(created) / 1024
         print('  %-46s %6.1f KB' % (os.path.basename(created), size))
