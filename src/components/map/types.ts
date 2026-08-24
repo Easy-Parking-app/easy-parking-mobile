@@ -7,6 +7,8 @@ export type MapMarker = {
   coordinate: LatLng;
   /** COP per hour, rendered inside the pill. */
   price: number;
+  /** Sin un solo cupo libre. La píldora se pinta en rojo. */
+  full?: boolean;
   label: string;
 };
 

@@ -90,6 +90,8 @@ function outline(width: number) {
 export type PriceMarkerProps = {
   price: number;
   selected: boolean;
+  /** Sin un solo cupo libre. */
+  full?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
 };
@@ -97,6 +99,7 @@ export type PriceMarkerProps = {
 export const PriceMarker = memo(function PriceMarker({
   price,
   selected,
+  full = false,
   onPress,
   accessibilityLabel,
 }: PriceMarkerProps) {
@@ -113,14 +116,21 @@ export const PriceMarker = memo(function PriceMarker({
     ],
   }));
 
-  // Dos estados y no tres. Antes las que no tenian cupos salian en gris, pero
-  // en el mapa eso se lee como "esta apagada" y no como "esta llena", y rompe
-  // la lectura de un vistazo: la fila de precios deja de compararse sola. La
-  // disponibilidad la dice la lista, con su etiqueta, donde si hay sitio para
-  // explicarla.
-  const fill = selected ? palette.ink : palette.bg;
-  const stroke = selected ? palette.ink : palette.hairline;
-  const label = selected ? palette.inkInverse : palette.ink;
+  /**
+   * Tres estados.
+   *
+   * "Lleno" va en rojo y no en gris. Un gris sobre el mapa se lee como "está
+   * apagada", que no dice nada; el rojo dice que no hay sitio, y lo dice sin
+   * tener que leer el precio. Es el único color de alarma del sistema y este es
+   * exactamente su caso: información que cambia la decisión.
+   *
+   * La selección gana al rojo cuando coinciden: al tocar, lo que importa es
+   * cuál se está mirando, y el detalle que se abre debajo ya dice si está lleno.
+   */
+  const alert = full && !selected;
+  const fill = selected ? palette.ink : alert ? palette.danger : palette.bg;
+  const stroke = selected ? palette.ink : alert ? palette.danger : palette.hairline;
+  const label = selected || alert ? palette.inkInverse : palette.ink;
 
   const width = priceMarkerWidth(price);
 

@@ -236,6 +236,7 @@ export function MapCanvas({
                   <PriceMarker
                     price={marker.price}
                     selected={selected}
+                    full={marker.full}
                     accessibilityLabel={marker.label}
                     onPress={() => onSelectMarker(selected ? null : marker.id)}
                   />

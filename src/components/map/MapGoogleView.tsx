@@ -34,7 +34,8 @@ import { UserDot } from './UserDot';
  */
 const INITIAL_ZOOM = 14;
 
-const priceKey = (price: number, selected: boolean) => `p${price}${selected ? 's' : ''}`;
+const priceKey = (price: number, selected: boolean, full: boolean) =>
+  `p${price}${selected ? 's' : ''}${full ? 'f' : ''}`;
 
 export function MapGoogleView({
   markers,
@@ -64,8 +65,9 @@ export function MapGoogleView({
     const seen = new Set<string>();
 
     for (const marker of markers) {
+      const full = marker.full ?? false;
       for (const selected of [false, true]) {
-        const key = priceKey(marker.price, selected);
+        const key = priceKey(marker.price, selected, full);
         if (seen.has(key)) continue;
         seen.add(key);
         list.push({
@@ -74,6 +76,7 @@ export function MapGoogleView({
             <PriceMarker
               price={marker.price}
               selected={selected}
+              full={full}
               onPress={() => {}}
               accessibilityLabel={marker.label}
             />
@@ -164,13 +167,27 @@ export function MapGoogleView({
 
         {markers.map((marker) => {
           const selected = marker.id === selectedId;
-          const uri = images[priceKey(marker.price, selected)];
+          const key = priceKey(marker.price, selected, marker.full ?? false);
+          const uri = images[key];
           // Sin imagen todavía no se dibuja nada: mejor que un marcador a medias.
           if (!uri) return null;
 
           return (
             <Marker
-              key={marker.id}
+              /**
+               * La imagen forma parte de la identidad, no solo el parqueadero.
+               *
+               * Cambiar `image` sobre un marcador ya montado no siempre lo
+               * refresca: la librería cachea el icono por URI y en `setImage`
+               * hay un camino —cuando otro marcador ya empezó a cargar esa
+               * misma URI— que sale con `return` sin llamar a `update()`. El
+               * marcador se queda con el icono anterior; en la práctica, una
+               * píldora que se quedaba negra después de deseleccionarla.
+               *
+               * Con la imagen en la clave, React monta un marcador nuevo en vez
+               * de mutar el existente, y no hay icono viejo que se quede.
+               */
+              key={`${marker.id}:${key}`}
               coordinate={marker.coordinate}
               image={{ uri }}
               // La punta del pico marca el sitio, no el centro de la píldora.
