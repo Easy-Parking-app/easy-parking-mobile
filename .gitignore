@@ -42,3 +42,6 @@ yarn-error.*
 
 # editor / agent scratch
 .claude/
+
+# PDF generados por scripts/generate-investor-pdfs.py
+docs/inversores/*.pdf
