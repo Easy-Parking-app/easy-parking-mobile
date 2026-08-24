@@ -1,22 +1,13 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  type SharedValue,
-} from 'react-native-reanimated';
-import MapView, {
-  PROVIDER_GOOGLE,
-  type MapPressEvent,
-  type Region,
-} from 'react-native-maps';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE, type MapPressEvent } from 'react-native-maps';
 
 import { motion } from '@/constants/theme';
-import type { LatLng } from '@/types';
 import { googleMapStyle } from './googleMapStyle';
-import { PLACE_PIN_HEIGHT, PlacePin } from './PlacePin';
-import { PRICE_MARKER_HEIGHT, PriceMarker, priceMarkerWidth } from './PriceMarker';
-import type { MapMarker, MapViewProps } from './types';
+import { PlacePin } from './PlacePin';
+import { PriceMarker } from './PriceMarker';
+import type { MapViewProps } from './types';
+import { useMarkerImages, type MarkerImageRequest } from './useMarkerImages';
 import { UserDot } from './UserDot';
 
 /**
@@ -26,35 +17,10 @@ import { UserDot } from './UserDot';
  * cuál de los dos están usando. `MapViewImpl` elige: este en móvil, el dibujado
  * en web.
  *
- * ---
- *
- * **Por qué las marcas no son `<Marker>`.**
- *
- * Lo natural sería colgar cada píldora de un `<Marker>` y dejar que el mapa
- * nativo la mantenga pegada a su coordenada. No se puede con la versión de
- * react-native-maps que trae Expo Go SDK 54, y conviene dejarlo escrito para
- * que nadie lo intente otra vez.
- *
- * Un `<Marker>` con hijos no se dibuja: se rasteriza a un bitmap. En
- * `MapMarker.java`:
- *
- *     int width  = this.width  <= 0 ? 100 : this.width;
- *     int height = this.height <= 0 ? 100 : this.height;
- *
- * Quien rellena `this.width` es `SizeReportingShadowNode`, vía
- * `createShadowNodeInstance` y `updateExtraData`: dos APIs de la arquitectura
- * vieja. react-native-maps 1.20.1 no declara `codegenConfig` —no soporta la
- * nueva arquitectura— así que pasa por la capa de interoperabilidad, que no
- * llama a ninguna de las dos. El tamaño nunca se reporta y el fallback se
- * aplica siempre.
- *
- * Y ese 100 es en **píxeles físicos**: unos 50 dp en densidad 2, 33 en
- * densidad 3. Un precio no cabe ahí. No era cuestión de apretar el diseño: el
- * techo está por debajo de lo que el contenido necesita.
- *
- * La 1.21.0 en adelante sí trae `codegenConfig`. El día que el proyecto use
- * compilación propia en vez de Expo Go, se puede actualizar y volver a
- * `<Marker>`.
+ * Las marcas son `<Marker>` nativos con una imagen, no vistas de React. El
+ * porqué —y las dos alternativas que se descartaron— está en
+ * `useMarkerImages`. Lo que se gana aquí: las mueve el mapa, así que quedan
+ * clavadas a su coordenada sin temblor ni retraso.
  */
 
 /**
@@ -68,139 +34,8 @@ import { UserDot } from './UserDot';
  */
 const INITIAL_ZOOM = 14;
 
-/** Margen fuera de pantalla antes de ocultar una marca. */
-const CULL_MARGIN = 80;
-
-/* --------------------------------------------------------------- proyección */
-
-/**
- * Latitud proyectada en Mercator.
- *
- * Google Maps usa Web Mercator, donde la latitud no es lineal. A escala de
- * ciudad la diferencia con una proyección lineal es de milésimas de píxel, pero
- * cuesta una línea hacerlo bien y así no aparece deriva al alejar el zoom.
- *
- * Es un worklet: corre en el hilo de UI, dentro del estilo animado.
- */
-function mercator(latitude: number) {
-  'worklet';
-  return Math.log(Math.tan(Math.PI / 4 + (latitude * Math.PI) / 360));
-}
-
-/**
- * La región visible, en un único valor compartido.
- *
- * Compartido y no estado de React: es la diferencia entre que las marcas sigan
- * al dedo y que vayan un paso por detrás. `onRegionChange` se dispara en cada
- * frame del gesto; si cada uno provocara un render, React tendría que
- * reconciliar doce vistas por frame y la capa se quedaría atrás del mapa —que
- * se mueve en el hilo nativo—.
- *
- * **Uno y no cuatro, y eso importa.** Escribir centro y deltas en cuatro
- * valores distintos son cuatro sincronizaciones independientes hacia el hilo de
- * UI, y no hay garantía de que lleguen en el mismo frame. Cuando no llegan, la
- * proyección mezcla el centro nuevo con el zoom viejo, y el resultado es que
- * las marcas tiemblan mientras el mapa se mueve. Un solo objeto se actualiza de
- * forma atómica: o está entero o no está.
- */
-type Region4 = {
-  latitude: number;
-  longitude: number;
-  latitudeDelta: number;
-  longitudeDelta: number;
-};
-
-type Viewport = {
-  region: SharedValue<Region4>;
-  width: SharedValue<number>;
-  height: SharedValue<number>;
-};
-
-type MarkProps = {
-  viewport: Viewport;
-  coordinate: LatLng;
-  /** Desplazamiento desde el punto hasta la esquina superior izquierda. */
-  offsetX: number;
-  offsetY: number;
-  /**
-   * El mismo `mapPadding` que recibe el mapa.
-   *
-   * Hace falta porque la región que llega por `onRegionChange` no es la de toda
-   * la vista sino **la de dentro del padding**: `RegionChangeEvent` la saca de
-   * `getProjection().getVisibleRegion()`, y Google Maps documenta que esa región
-   * excluye el padding.
-   *
-   * Sin descontarlo, la franja central se estira sobre la pantalla entera. El
-   * error no es constante: crece y encoge con el zoom, así que las marcas se
-   * desplazan al acercar y alejar.
-   */
-  topInset: number;
-  bottomInset: number;
-  children: React.ReactNode;
-  pointerEvents?: 'none' | 'box-none';
-};
-
-/** Una marca anclada a una coordenada. Se posiciona en el hilo de UI. */
-const Mark = memo(function Mark({
-  viewport,
-  coordinate,
-  offsetX,
-  offsetY,
-  topInset,
-  bottomInset,
-  children,
-  pointerEvents = 'none',
-}: MarkProps) {
-  const style = useAnimatedStyle(() => {
-    // Una sola lectura: el resto del cálculo trabaja sobre esta instantánea, de
-    // modo que centro y zoom siempre corresponden al mismo frame.
-    const region = viewport.region.value;
-    const viewWidth = viewport.width.value;
-    const viewHeight = viewport.height.value;
-
-    if (region.longitudeDelta === 0 || viewWidth === 0) {
-      return { opacity: 0, transform: [{ translateX: 0 }, { translateY: 0 }] };
-    }
-
-    const west = region.longitude - region.longitudeDelta / 2;
-    const north = region.latitude + region.latitudeDelta / 2;
-    const south = region.latitude - region.latitudeDelta / 2;
-
-    const top = mercator(north);
-    const span = top - mercator(south);
-
-    // La región cubre solo la franja que deja el padding, no la vista entera.
-    const bandTop = topInset;
-    const bandHeight = Math.max(1, viewHeight - topInset - bottomInset);
-
-    const x = ((coordinate.longitude - west) / region.longitudeDelta) * viewWidth;
-    const y =
-      span === 0
-        ? 0
-        : bandTop + ((top - mercator(coordinate.latitude)) / span) * bandHeight;
-
-    // Fuera de pantalla no se oculta la vista, solo se apaga: montarla y
-    // desmontarla en cada paneo costaría más que dejarla quieta.
-    const visible =
-      x > -CULL_MARGIN &&
-      x < viewWidth + CULL_MARGIN &&
-      y > -CULL_MARGIN &&
-      y < viewHeight + CULL_MARGIN;
-
-    return {
-      opacity: visible ? 1 : 0,
-      // Transform y no `left`/`top`: mover con transform no dispara layout, que
-      // es justo lo que no puede pasar sesenta veces por segundo.
-      transform: [{ translateX: x + offsetX }, { translateY: y + offsetY }],
-    };
-  });
-
-  return (
-    <Animated.View style={[styles.mark, style]} pointerEvents={pointerEvents}>
-      {children}
-    </Animated.View>
-  );
-});
+const priceKey = (price: number, selected: boolean, unavailable: boolean) =>
+  `p${price}${selected ? 's' : ''}${unavailable ? 'x' : ''}`;
 
 export function MapGoogleView({
   markers,
@@ -218,50 +53,44 @@ export function MapGoogleView({
 }: MapViewProps) {
   const mapRef = useRef<MapView>(null);
 
-  const region = useSharedValue<Region4>({
-    latitude: userLocation.latitude,
-    longitude: userLocation.longitude,
-    // Cero significa "todavía no sabemos": las marcas se quedan apagadas hasta
-    // que llegue la primera región de verdad.
-    latitudeDelta: 0,
-    longitudeDelta: 0,
-  });
-  const width = useSharedValue(0);
-  const height = useSharedValue(0);
-
   /**
-   * Agrupados una sola vez.
+   * Las variantes que hay que tener como imagen.
    *
-   * Los valores compartidos son estables, pero el objeto que los envuelve no lo
-   * sería si se creara en cada render: `Mark` está memoizado y recibiría una
-   * referencia nueva cada vez, así que el `memo` no serviría de nada.
+   * Se piden los dos estados de cada precio aunque solo uno esté seleccionado:
+   * capturar al momento de tocar dejaría un parpadeo justo en la interacción
+   * más frecuente de la pantalla.
    */
-  const viewport: Viewport = useMemo(
-    () => ({ region, width, height }),
-    [height, region, width],
-  );
+  const requests = useMemo(() => {
+    const list: MarkerImageRequest[] = [];
+    const seen = new Set<string>();
 
-  const onLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      width.value = event.nativeEvent.layout.width;
-      height.value = event.nativeEvent.layout.height;
-    },
-    [height, width],
-  );
+    for (const marker of markers) {
+      for (const selected of [false, true]) {
+        const key = priceKey(marker.price, selected, marker.unavailable ?? false);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        list.push({
+          key,
+          render: () => (
+            <PriceMarker
+              price={marker.price}
+              selected={selected}
+              unavailable={marker.unavailable}
+              onPress={() => {}}
+              accessibilityLabel={marker.label}
+            />
+          ),
+        });
+      }
+    }
 
-  const onRegionChange = useCallback(
-    (next: Region) => {
-      // Una sola escritura. Ver la nota en `Viewport`: repartirla en cuatro
-      // hace que el hilo de UI pueda ver una región a medio actualizar.
-      region.value = {
-        latitude: next.latitude,
-        longitude: next.longitude,
-        latitudeDelta: next.latitudeDelta,
-        longitudeDelta: next.longitudeDelta,
-      };
-    },
-    [region],
-  );
+    if (showsUser) list.push({ key: 'user', render: () => <UserDot /> });
+    if (pin) list.push({ key: 'pin', render: () => <PlacePin /> });
+
+    return list;
+  }, [markers, pin, showsUser]);
+
+  const { images, factory } = useMarkerImages(requests);
 
   // Mueve la cámara cuando cambia el foco: al elegir un parqueadero o al buscar
   // en otra zona. `focus` nulo significa "quédate donde está el conductor".
@@ -270,8 +99,6 @@ export function MapGoogleView({
     mapRef.current?.animateCamera({ center }, { duration: motion.duration.slow });
   }, [focus, userLocation]);
 
-  // Tocar el mapa deselecciona, y además entrega la coordenada a quien la haya
-  // pedido. La capa de marcas no lo intercepta: es `box-none`.
   const handleMapPress = useCallback(
     (event: MapPressEvent) => {
       if (selectedId != null) onSelectMarker(null);
@@ -281,7 +108,10 @@ export function MapGoogleView({
   );
 
   return (
-    <View style={[styles.root, style]} onLayout={onLayout}>
+    <View style={[styles.root, style]}>
+      {/* Debajo del mapa, que lo tapa. Ver la nota en useMarkerImages. */}
+      {factory}
+
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
@@ -300,15 +130,10 @@ export function MapGoogleView({
         // Empuja el centro de la cámara fuera de las zonas tapadas por los
         // controles flotantes y por la hoja inferior.
         mapPadding={{ top: topInset, bottom: bottomInset, left: 0, right: 0 }}
-        // En Android esto se dispara durante el gesto, no solo al soltar, que
-        // es lo que permite que la capa siga al dedo.
-        onRegionChange={onRegionChange}
-        onRegionChangeComplete={onRegionChange}
         onPress={handleMapPress}
         scrollEnabled={interactive}
         zoomEnabled={interactive}
-        // Rotar e inclinar romperían la proyección: supone el norte arriba y la
-        // cámara en cenital. Tampoco aportan nada aquí.
+        // Rotar e inclinar no aportan nada aquí y descuadran las etiquetas.
         rotateEnabled={false}
         pitchEnabled={false}
         // Dibujamos nuestro propio punto: el azul de Google es de otra marca.
@@ -318,57 +143,48 @@ export function MapGoogleView({
         toolbarEnabled={false}
         showsPointsOfInterest={false}
         showsIndoors={false}
-      />
-
-      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-        {showsUser ? (
-          <Mark
-            viewport={viewport}
+      >
+        {showsUser && images.user ? (
+          <Marker
             coordinate={userLocation}
-            offsetX={-22}
-            offsetY={-22}
-            topInset={topInset}
-            bottomInset={bottomInset}
-          >
-            <UserDot />
-          </Mark>
+            image={{ uri: images.user }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            accessibilityLabel="Tu ubicación"
+          />
         ) : null}
 
-        {pin ? (
-          // La punta del pin señala: el alto cuelga hacia arriba desde el punto.
-          <Mark
-            viewport={viewport}
+        {pin && images.pin ? (
+          <Marker
             coordinate={pin}
-            offsetX={-17}
-            offsetY={-PLACE_PIN_HEIGHT}
-            topInset={topInset}
-            bottomInset={bottomInset}
-          >
-            <PlacePin />
-          </Mark>
+            image={{ uri: images.pin }}
+            // La punta del pin, abajo del todo, es lo que señala.
+            anchor={{ x: 0.5, y: 1 }}
+            zIndex={3}
+            accessibilityLabel="Ubicación elegida"
+          />
         ) : null}
 
-        {markers.map((marker: MapMarker) => (
-          <Mark
-            key={marker.id}
-            viewport={viewport}
-            coordinate={marker.coordinate}
-            offsetX={-priceMarkerWidth(marker.price) / 2}
-            offsetY={-PRICE_MARKER_HEIGHT}
-            topInset={topInset}
-            bottomInset={bottomInset}
-            pointerEvents="box-none"
-          >
-            <PriceMarker
-              price={marker.price}
-              selected={marker.id === selectedId}
-              unavailable={marker.unavailable}
+        {markers.map((marker) => {
+          const selected = marker.id === selectedId;
+          const uri = images[priceKey(marker.price, selected, marker.unavailable ?? false)];
+          // Sin imagen todavía no se dibuja nada: mejor que un marcador a medias.
+          if (!uri) return null;
+
+          return (
+            <Marker
+              key={marker.id}
+              coordinate={marker.coordinate}
+              image={{ uri }}
+              // La punta del pico marca el sitio, no el centro de la píldora.
+              anchor={{ x: 0.5, y: 1 }}
               onPress={() => onSelectMarker(marker.id)}
+              // El seleccionado va encima: si otro lo tapa, deja de leerse.
+              zIndex={selected ? 2 : 1}
               accessibilityLabel={marker.label}
             />
-          </Mark>
-        ))}
-      </View>
+          );
+        })}
+      </MapView>
     </View>
   );
 }
@@ -377,10 +193,5 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     overflow: 'hidden',
-  },
-  mark: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
   },
 });
